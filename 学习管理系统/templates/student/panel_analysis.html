@@ -1,0 +1,47 @@
+{% extends 'student/student.html' %}
+{% block panel_analysis %}
+<div id="analysis-charts"></div>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // 获取后端传递的考试标签和各学科成绩数据
+  const examLabels = {{ exam_labels|tojson|safe }};
+  const chartData = {{ chart_data|tojson|safe }};
+  const colors = [
+    '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#343a40'
+  ];
+  const container = document.getElementById('analysis-charts');
+  chartData.forEach((subject, idx) => {
+    // 创建canvas元素
+    const card = document.createElement('div');
+    card.className = 'card mb-4';
+    card.innerHTML = `<div class="card-header bg-info text-white">${subject.subject_name}成绩趋势</div><div class="card-body"><canvas id="chart-${subject.subject_id}" height="200"></canvas></div>`;
+    container.appendChild(card);
+    // 绘制折线图
+    const ctx = document.getElementById(`chart-${subject.subject_id}`).getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: examLabels,
+        datasets: [{
+          label: subject.subject_name,
+          data: subject.scores,
+          borderColor: colors[idx % colors.length],
+          backgroundColor: 'rgba(0,123,255,0.1)',
+          fill: false,
+          spanGaps: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: false, title: { display: true, text: '成绩' } },
+          x: { title: { display: true, text: '考试' } }
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}
+
