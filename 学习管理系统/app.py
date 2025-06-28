@@ -287,6 +287,8 @@ def student_report():
         reports=reports
     )
 
+ #       李之爹的领域
+
 # 教师主页
 @app.route('/teacher/profile')
 def teacher_profile():
@@ -303,6 +305,47 @@ def teacher_profile():
     else:
         name, title, contact_email = '', '', ''
     return render_template('teacher/profile.html', name=name, title=title, contact_email=contact_email)
+
+
+#所教学生档案
+@app.route('/teacher/students')
+def teacher_students():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查teacher_id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('teacher/students.html', students=[])
+    teacher_id = row[0]
+    # 查该老师作为班主任的学生
+    cursor.execute('''
+        SELECT s.student_id, s.name, c.class_name
+        FROM student s
+        JOIN class c ON s.class_id = c.class_id
+        WHERE c.head_teacher_id = ?
+    ''', teacher_id)
+    students1 = cursor.fetchall()
+    # 查该老师作为任课老师的学生
+    cursor.execute('''
+        SELECT s.student_id, s.name, c.class_name
+        FROM teacher_class_subject tcs
+        JOIN class c ON tcs.class_id = c.class_id
+        JOIN student s ON s.class_id = c.class_id
+        WHERE tcs.teacher_id = ?
+    ''', teacher_id)
+    students2 = cursor.fetchall()
+    # 合并去重
+    all_students = { (s[0], s[1], s[2]) for s in students1 + students2 }
+    students = list(all_students)
+    conn.close()
+    return render_template('teacher/students.html', students=students)
+
+ #        领域结束
 
 # 班主任主页
 @app.route('/classmaster/profile')
