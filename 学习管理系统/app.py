@@ -286,9 +286,13 @@ def student_report():
         scores=scores,
         reports=reports
     )
-
+#################################
+#
+#
  #       李之爹的领域
-
+#
+#
+################################
 # 教师主页
 @app.route('/teacher/profile')
 def teacher_profile():
@@ -394,13 +398,14 @@ def teacher_evaluate():
         return render_template('teacher/evaluate.html', scores=[])
     teacher_id = row[0]
     cursor.execute('''
-        SELECT s.student_id, s.name, c.class_name, sub.subject_name, e.exam_name, es.score
+        SELECT s.student_id, s.name, c.class_name, sub.subject_name, e.exam_name, es.score, sr.content
         FROM teacher_class_subject tcs
         JOIN class c ON tcs.class_id = c.class_id
         JOIN student s ON s.class_id = c.class_id
         JOIN subject sub ON tcs.subject_id = sub.subject_id
         JOIN exam_score es ON es.student_id = s.student_id AND es.subject_id = sub.subject_id
         JOIN exam e ON es.exam_id = e.exam_id
+        LEFT JOIN study_report sr ON sr.student_id = s.student_id AND sr.teacher_id = tcs.teacher_id AND sr.report_date = e.exam_date
         WHERE tcs.teacher_id = ?
         ORDER BY c.class_name, s.name, sub.subject_name, e.exam_date DESC
     ''', teacher_id)
@@ -439,6 +444,58 @@ def teacher_class():
     class_scores = cursor.fetchall()
     conn.close()
     return render_template('teacher/class.html', class_scores=class_scores)
+
+
+@app.route('/teacher/evaluate/update', methods=['POST'])
+def teacher_evaluate_update():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    student_id = request.form['student_id']
+    subject_name = request.form['subject_name']
+    exam_name = request.form['exam_name']
+    content = request.form['content']
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查subject_id, exam_id, teacher_id
+    cursor.execute('SELECT subject_id FROM subject WHERE subject_name=?', subject_name)
+    subject_row = cursor.fetchone()
+    cursor.execute('SELECT exam_id, exam_date FROM exam WHERE exam_name=?', exam_name)
+    exam_row = cursor.fetchone()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    teacher_row = cursor.fetchone()
+    if not (subject_row and exam_row and teacher_row):
+        conn.close()
+        flash('参数错误', 'danger')
+        return redirect(url_for('teacher_evaluate'))
+    subject_id = subject_row[0]
+    exam_id, exam_date = exam_row
+    teacher_id = teacher_row[0]
+    # 查是否已有评价
+    cursor.execute('SELECT report_id FROM study_report WHERE student_id=? AND teacher_id=? AND report_date=?', student_id, teacher_id, exam_date)
+    report = cursor.fetchone()
+    if report:
+        cursor.execute('UPDATE study_report SET content=? WHERE report_id=?', content, report[0])
+    else:
+        import uuid
+        report_id = str(uuid.uuid4())[:20]
+        cursor.execute('INSERT INTO study_report (report_id, student_id, teacher_id, report_date, content, evaluation_level) VALUES (?, ?, ?, ?, ?, ?)',
+                       report_id, student_id, teacher_id, exam_date, content, None)
+    conn.commit()
+    conn.close()
+    flash('评价已保存', 'success')
+    return redirect(url_for('teacher_evaluate'))
+
+
+
+##########################
+#
+#
+#      领域结束
+#
+#
+##########################
+
 
 # 班主任主页
 @app.route('/classmaster/profile')

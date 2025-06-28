@@ -16,26 +16,23 @@
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">学生成绩评价</h2>
-            {% set ns = namespace(excellent=0, good=0, normal=0, passed=0, failed=0) %}
+            {% set ns = namespace(A=0, B=0, C=0, D=0) %}
             {% for s in scores %}
                 {% if s[5] >= 90 %}
-                    {% set ns.excellent = ns.excellent + 1 %}
-                {% elif s[5] >= 80 %}
-                    {% set ns.good = ns.good + 1 %}
-                {% elif s[5] >= 70 %}
-                    {% set ns.normal = ns.normal + 1 %}
+                    {% set ns.A = ns.A + 1 %}
+                {% elif s[5] >= 75 %}
+                    {% set ns.B = ns.B + 1 %}
                 {% elif s[5] >= 60 %}
-                    {% set ns.passed = ns.passed + 1 %}
+                    {% set ns.C = ns.C + 1 %}
                 {% else %}
-                    {% set ns.failed = ns.failed + 1 %}
+                    {% set ns.D = ns.D + 1 %}
                 {% endif %}
             {% endfor %}
             <div class="mb-3">
-                <span class="badge badge-success">优秀：{{ ns.excellent }}</span>
-                <span class="badge badge-primary">良好：{{ ns.good }}</span>
-                <span class="badge badge-info">一般：{{ ns.normal }}</span>
-                <span class="badge badge-warning">合格：{{ ns.passed }}</span>
-                <span class="badge badge-danger">不合格：{{ ns.failed }}</span>
+                <span class="badge badge-success">A：{{ ns.A }}</span>
+                <span class="badge badge-primary">B：{{ ns.B }}</span>
+                <span class="badge badge-info">C：{{ ns.C }}</span>
+                <span class="badge badge-danger">D：{{ ns.D }}</span>
             </div>
             <table class="table table-bordered table-striped">
                 <thead>
@@ -47,6 +44,7 @@
                         <th>考试名称</th>
                         <th>成绩</th>
                         <th>评价</th>
+                        <th>老师评价</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,21 +58,30 @@
                         <td>{{ s[5] }}</td>
                         <td>
                             {% if s[5] >= 90 %}
-                                <span class="badge badge-success">优秀</span>
-                            {% elif s[5] >= 80 %}
-                                <span class="badge badge-primary">良好</span>
-                            {% elif s[5] >= 70 %}
-                                <span class="badge badge-info">一般</span>
+                                <span class="badge badge-success">A</span>
+                            {% elif s[5] >= 75 %}
+                                <span class="badge badge-primary">B</span>
                             {% elif s[5] >= 60 %}
-                                <span class="badge badge-warning">合格</span>
+                                <span class="badge badge-info">C</span>
                             {% else %}
-                                <span class="badge badge-danger">不合格</span>
+                                <span class="badge badge-danger">D</span>
                             {% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="/teacher/evaluate/update" class="form-inline mb-0">
+                                <input type="hidden" name="student_id" value="{{ s[0] }}">
+                                <input type="hidden" name="subject_name" value="{{ s[3] }}">
+                                <input type="hidden" name="exam_name" value="{{ s[4] }}">
+                                <textarea class="form-control form-control-sm mr-2" name="content" rows="1" style="min-width:120px;max-width:300px;resize:horizontal;display:inline-block;vertical-align:middle;">{{ s[6] if s|length > 6 else '' }}</textarea>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">保存</button>
+                            </form>
                         </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
         </main>
     </div>
 </div>
