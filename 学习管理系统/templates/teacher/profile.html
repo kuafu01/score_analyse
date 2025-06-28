@@ -17,7 +17,12 @@
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">个人档案</h2>
             <!-- 这里可展示老师个人信息，后续可加编辑功能 -->
-            <div class="alert alert-info">个人档案功能开发中...</div>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>姓名：</strong> {{ name }}</li>
+                <li class="list-group-item"><strong>职称：</strong> {{ title }}</li>
+                <li class="list-group-item"><strong>邮箱：</strong> {{ contact_email }}</li>
+            </ul>
+            
         </main>
     </div>
 </div>

@@ -292,7 +292,17 @@ def student_report():
 def teacher_profile():
     if session.get('role') != 'teacher':
         return redirect(url_for('login'))
-    return render_template('teacher/profile.html', name=session.get('name'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT name, title, contact_email FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        name, title, contact_email = row
+    else:
+        name, title, contact_email = '', '', ''
+    return render_template('teacher/profile.html', name=name, title=title, contact_email=contact_email)
 
 # 班主任主页
 @app.route('/classmaster/profile')
