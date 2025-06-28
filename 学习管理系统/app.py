@@ -61,9 +61,9 @@ def login():
             if user[2] == 'student':
                 return redirect(url_for('student_profile'))
             elif user[2] == 'teacher':
-                return redirect(url_for('teacher_home'))
+                return redirect(url_for('teacher_profile'))
             elif user[2] == 'classmaster':
-                return redirect(url_for('classmaster_home'))
+                return redirect(url_for('classmaster_profile'))
         else:
             flash('用户名或密码错误', 'danger')
     return render_template('login.html')
@@ -288,18 +288,18 @@ def student_report():
     )
 
 # 教师主页
-@app.route('/teacher')
-def teacher_home():
+@app.route('/teacher/profile')
+def teacher_profile():
     if session.get('role') != 'teacher':
         return redirect(url_for('login'))
-    return render_template('teacher/teacher.html', name=session.get('name'))
+    return render_template('teacher/profile.html', name=session.get('name'))
 
 # 班主任主页
-@app.route('/classmaster')
-def classmaster_home():
+@app.route('/classmaster/profile')
+def classmaster_profile():
     if session.get('role') != 'classmaster':
         return redirect(url_for('login'))
-    return render_template('classmaster/classmaster.html', name=session.get('name'))
+    return render_template('classmaster/profile.html', name=session.get('name'))
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,11 @@
+<!-- 学科老师侧边栏导航 -->
+<nav class="col-md-2 d-none d-md-block sidebar p-0">
+    <div class="list-group list-group-flush mt-4">
+        <a href="/teacher/profile" class="list-group-item list-group-item-action {% if active=='profile' %}active{% endif %}" id="nav-profile">个人档案</a>
+        <a href="/teacher/students" class="list-group-item list-group-item-action {% if active=='students' %}active{% endif %}" id="nav-students">所教学生档案</a>
+        <a href="/teacher/score" class="list-group-item list-group-item-action {% if active=='score' %}active{% endif %}" id="nav-score">成绩分析与管理</a>
+        <a href="/teacher/class" class="list-group-item list-group-item-action {% if active=='class' %}active{% endif %}" id="nav-class">班级成绩分析</a>
+        <a href="/teacher/evaluate" class="list-group-item list-group-item-action {% if active=='evaluate' %}active{% endif %}" id="nav-evaluate">学生成绩评价</a>
+        <a href="/logout" class="list-group-item list-group-item-action text-danger mt-5">退出登录</a>
+    </div>
+</nav>

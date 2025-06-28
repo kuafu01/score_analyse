@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>个人档案</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
+        .content-area { padding: 2rem; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        {% include 'teacher/_sidebar.html' %}
+        <main class="col-md-10 ml-sm-auto content-area">
+            <h2 class="mb-4">个人档案</h2>
+            <!-- 这里可展示老师个人信息，后续可加编辑功能 -->
+            <div class="alert alert-info">个人档案功能开发中...</div>
+        </main>
+    </div>
+</div>
+</body>
+</html>
