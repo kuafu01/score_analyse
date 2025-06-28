@@ -345,7 +345,73 @@ def teacher_students():
     conn.close()
     return render_template('teacher/students.html', students=students)
 
- #        领域结束
+
+#成绩分析与管理score
+@app.route('/teacher/score')
+def teacher_score():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查teacher_id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('teacher/score.html', scores=[])
+    teacher_id = row[0]
+    # 查询该老师所教学生的成绩明细
+    cursor.execute('''
+        SELECT s.student_id, s.name, c.class_name, sub.subject_name, e.exam_name, es.score
+        FROM teacher_class_subject tcs
+        JOIN class c ON tcs.class_id = c.class_id
+        JOIN student s ON s.class_id = c.class_id
+        JOIN subject sub ON tcs.subject_id = sub.subject_id
+        JOIN exam_score es ON es.student_id = s.student_id AND es.subject_id = sub.subject_id
+        JOIN exam e ON es.exam_id = e.exam_id
+        WHERE tcs.teacher_id = ?
+        ORDER BY c.class_name, s.name, sub.subject_name, e.exam_date DESC
+    ''', teacher_id)
+    scores = cursor.fetchall()
+    conn.close()
+    #调试
+    #print('scores:', scores)
+    return render_template('teacher/score.html', scores=scores)
+
+#学生成绩评价evalute
+@app.route('/teacher/evaluate')
+def teacher_evaluate():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('teacher/evaluate.html', scores=[])
+    teacher_id = row[0]
+    cursor.execute('''
+        SELECT s.student_id, s.name, c.class_name, sub.subject_name, e.exam_name, es.score
+        FROM teacher_class_subject tcs
+        JOIN class c ON tcs.class_id = c.class_id
+        JOIN student s ON s.class_id = c.class_id
+        JOIN subject sub ON tcs.subject_id = sub.subject_id
+        JOIN exam_score es ON es.student_id = s.student_id AND es.subject_id = sub.subject_id
+        JOIN exam e ON es.exam_id = e.exam_id
+        WHERE tcs.teacher_id = ?
+        ORDER BY c.class_name, s.name, sub.subject_name, e.exam_date DESC
+    ''', teacher_id)
+    scores = cursor.fetchall()
+    conn.close()
+    return render_template('teacher/evaluate.html', scores=scores)
+
+
+
+
+
 
 # 班主任主页
 @app.route('/classmaster/profile')

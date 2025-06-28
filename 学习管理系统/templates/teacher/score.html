@@ -16,7 +16,30 @@
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">成绩分析与管理</h2>
-            <div class="alert alert-info">成绩分析与管理功能开发中...</div>
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>学号</th>
+                        <th>姓名</th>
+                        <th>班级</th>
+                        <th>学科</th>
+                        <th>考试名称</th>
+                        <th>成绩</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for s in scores %}
+                    <tr>
+                        <td>{{ s[0] }}</td>
+                        <td>{{ s[1] }}</td>
+                        <td>{{ s[2] }}</td>
+                        <td>{{ s[3] }}</td>
+                        <td>{{ s[4] }}</td>
+                        <td>{{ s[5] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </main>
     </div>
 </div>
