@@ -16,6 +16,27 @@
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">学生成绩评价</h2>
+            {% set ns = namespace(excellent=0, good=0, normal=0, passed=0, failed=0) %}
+            {% for s in scores %}
+                {% if s[5] >= 90 %}
+                    {% set ns.excellent = ns.excellent + 1 %}
+                {% elif s[5] >= 80 %}
+                    {% set ns.good = ns.good + 1 %}
+                {% elif s[5] >= 70 %}
+                    {% set ns.normal = ns.normal + 1 %}
+                {% elif s[5] >= 60 %}
+                    {% set ns.passed = ns.passed + 1 %}
+                {% else %}
+                    {% set ns.failed = ns.failed + 1 %}
+                {% endif %}
+            {% endfor %}
+            <div class="mb-3">
+                <span class="badge badge-success">优秀：{{ ns.excellent }}</span>
+                <span class="badge badge-primary">良好：{{ ns.good }}</span>
+                <span class="badge badge-info">一般：{{ ns.normal }}</span>
+                <span class="badge badge-warning">合格：{{ ns.passed }}</span>
+                <span class="badge badge-danger">不合格：{{ ns.failed }}</span>
+            </div>
             <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
@@ -38,7 +59,17 @@
                         <td>{{ s[4] }}</td>
                         <td>{{ s[5] }}</td>
                         <td>
-                            <a class="btn btn-sm btn-primary" href="/teacher/evaluate/add?student_id={{ s[0] }}&subject_name={{ s[3] }}&exam_name={{ s[4] }}">评价</a>
+                            {% if s[5] >= 90 %}
+                                <span class="badge badge-success">优秀</span>
+                            {% elif s[5] >= 80 %}
+                                <span class="badge badge-primary">良好</span>
+                            {% elif s[5] >= 70 %}
+                                <span class="badge badge-info">一般</span>
+                            {% elif s[5] >= 60 %}
+                                <span class="badge badge-warning">合格</span>
+                            {% else %}
+                                <span class="badge badge-danger">不合格</span>
+                            {% endif %}
                         </td>
                     </tr>
                 {% endfor %}

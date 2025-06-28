@@ -409,9 +409,36 @@ def teacher_evaluate():
     return render_template('teacher/evaluate.html', scores=scores)
 
 
-
-
-
+#班级成绩分析
+@app.route('/teacher/class')
+def teacher_class():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查teacher_id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('teacher/class.html', class_scores=[])
+    teacher_id = row[0]
+    # 查询该老师所教班级、学科、考试的学生成绩均分
+    cursor.execute('''
+        SELECT c.class_name, sub.subject_name, e.exam_name, AVG(es.score) as avg_score
+        FROM teacher_class_subject tcs
+        JOIN class c ON tcs.class_id = c.class_id
+        JOIN subject sub ON tcs.subject_id = sub.subject_id
+        JOIN exam_score es ON es.subject_id = sub.subject_id AND es.student_id IN (SELECT student_id FROM student WHERE class_id = c.class_id)
+        JOIN exam e ON es.exam_id = e.exam_id
+        WHERE tcs.teacher_id = ?
+        GROUP BY c.class_name, sub.subject_name, e.exam_name
+        ORDER BY c.class_name, sub.subject_name, e.exam_name
+    ''', teacher_id)
+    class_scores = cursor.fetchall()
+    conn.close()
+    return render_template('teacher/class.html', class_scores=class_scores)
 
 # 班主任主页
 @app.route('/classmaster/profile')

@@ -16,7 +16,26 @@
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">班级成绩分析</h2>
-            <div class="alert alert-info">班级成绩分析功能开发中...</div>
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>班级</th>
+                        <th>学科</th>
+                        <th>考试名称</th>
+                        <th>平均分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in class_scores %}
+                    <tr>
+                        <td>{{ row[0] }}</td>
+                        <td>{{ row[1] }}</td>
+                        <td>{{ row[2] }}</td>
+                        <td>{{ row[3]|round(2) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </main>
     </div>
 </div>
