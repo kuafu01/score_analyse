@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="UTF-8">
+    <title>近期学习报告</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+
+        .sidebar {
+            min-height: 100vh;
+            background: #fff;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .sidebar .nav-link.active {
+            background: #007bff;
+            color: #fff !important;
+        }
+
+        .content-area {
+            padding: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            {% include 'student/_sidebar.html' %}
+            <main class="col-md-10 ml-sm-auto content-area">
+                <h2 class="mb-4">近期学习报告</h2>
+                <form method="get" class="form-inline mb-3">
+                    <label for="exam-select" class="mr-2">选择考试：</label>
+                    <select id="exam-select" name="exam_id" class="form-control mr-2" onchange="this.form.submit()">
+                        {% for exam in exam_list %}
+                        <option value="{{ exam.exam_id }}" {% if exam.exam_id|string == selected_exam_id|string %}selected{% endif %}>
+                            {{ exam.exam_name }} ({{ exam.exam_date }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">各科成绩柱状图</div>
+                            <div class="card-body">
+                                <canvas id="report-bar-chart" height="220"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">成绩占比饼状图</div>
+                            <div class="card-body">
+                                <canvas id="report-pie-chart" height="220"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if not subjects %}
+                <div class="alert alert-warning mt-3">暂无该考试成绩数据</div>
+                {% endif %}
+
+                {% if reports %}
+                <div class="card mt-4">
+                    <div class="card-header bg-secondary text-white">各科老师评语</div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            {% for r in reports %}
+                            <li class="list-group-item">
+                                <strong>{{ r.subject }}（{{ r.teacher or '未知老师' }}）：</strong>
+                                <span>{{ r.content }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        var subjects = JSON.parse('{{ subjects|tojson|safe }}');
+        var scores = JSON.parse('{{ scores|tojson|safe }}');
+        if(subjects.length > 0) {
+            // 柱状图
+            const barCtx = document.getElementById('report-bar-chart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: subjects,
+                    datasets: [{
+                        label: '成绩',
+                        data: scores,
+                        backgroundColor: 'rgba(0,123,255,0.5)',
+                        borderColor: '#007bff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: '成绩' } },
+                        x: { title: { display: true, text: '学科' } }
+                    }
+                }
+            });
+            // 饼状图
+            const pieCtx = document.getElementById('report-pie-chart').getContext('2d');
+            const total = scores.reduce((a, b) => a + b, 0) || 1;
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: subjects,
+                    datasets: [{
+                        label: '占比',
+                        data: scores.map(s => (s / total * 100).toFixed(2)),
+                        backgroundColor: [
+                            '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#343a40'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true, position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    let value = context.raw || 0;
+                                    return `${label}: ${value}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

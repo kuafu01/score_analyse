@@ -59,7 +59,7 @@ def login():
             session['role'] = user[2]
             session['name'] = user[3]
             if user[2] == 'student':
-                return redirect(url_for('student_home'))
+                return redirect(url_for('student_profile'))
             elif user[2] == 'teacher':
                 return redirect(url_for('teacher_home'))
             elif user[2] == 'classmaster':
@@ -74,8 +74,8 @@ def logout():
     return redirect(url_for('login'))
 
 # 学生模块
-@app.route('/student')
-def student_home():
+@app.route('/student/profile')
+def student_profile():
     if session.get('role') != 'student':
         return redirect(url_for('login'))
     student_id = session.get('user_id')
@@ -85,7 +85,7 @@ def student_home():
     stu_username = cursor.fetchone()
     if not stu_username:
         conn.close()
-        return render_template('student/student.html', info={})
+        return render_template('student/profile.html', info={})
     student_id = stu_username[0]
     cursor.execute('''
         SELECT s.name, s.gender, s.birth_date, c.class_name, s.contact_phone, s.emergency_contact
@@ -103,7 +103,7 @@ def student_home():
         'contact_phone': row[4],
         'emergency_contact': row[5]
     } if row else {}
-    return render_template('student/student.html', info=info)
+    return render_template('student/profile.html', info=info)
 
 @app.route('/student/profile/edit', methods=['POST'])
 def student_profile_edit():
@@ -117,7 +117,7 @@ def student_profile_edit():
     if not stu_username:
         conn.close()
         flash('未找到学生信息', 'danger')
-        return redirect(url_for('student_home'))
+        return redirect(url_for('student_profile'))
     student_id = stu_username[0]
     name = request.form['name']
     gender = request.form['gender']
@@ -130,7 +130,7 @@ def student_profile_edit():
     conn.commit()
     conn.close()
     flash('个人档案已更新', 'success')
-    return redirect(url_for('student_home'))
+    return redirect(url_for('student_profile'))
 
 @app.route('/student/score')
 def student_score():
@@ -140,7 +140,6 @@ def student_score():
     kw = request.args.get('kw', '').strip()
     conn = get_conn()
     cursor = conn.cursor()
-    # 查询所有考试及成绩
     sql = '''
         SELECT e.exam_name, e.exam_type, e.exam_date, s.subject_name, es.score, es.ranking
         FROM exam_score es
@@ -150,13 +149,12 @@ def student_score():
     '''
     params = [student_id]
     if kw:
-        sql += " AND (e.exam_name LIKE ? OR s.subject_name LIKE ?)"
-        params.extend([f'%{kw}%', f'%{kw}%'])
+        sql += " AND e.exam_name LIKE ?"
+        params.append(f'%{kw}%')
     sql += " ORDER BY e.exam_date DESC, s.subject_id"
     cursor.execute(sql, *params)
     rows = cursor.fetchall()
     conn.close()
-    # 分组整理数据
     from collections import defaultdict
     exams = defaultdict(list)
     for r in rows:
@@ -166,7 +164,128 @@ def student_score():
         {'exam_name': k[0], 'exam_type': k[1], 'exam_date': k[2], 'scores': v}
         for k, v in exams.items()
     ]
-    return render_template('student/panel_score.html', exam_list=exam_list)
+    return render_template('student/score.html', exam_list=exam_list, kw=kw)
+
+@app.route('/student/analysis')
+def student_analysis():
+    if session.get('role') != 'student':
+        return redirect(url_for('login'))
+    student_id = session.get('username')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查询所有考试，按时间升序
+    cursor.execute('''
+        SELECT e.exam_id, e.exam_name, e.exam_date
+        FROM exam_score es
+        JOIN exam e ON es.exam_id = e.exam_id
+        WHERE es.student_id = ?
+        GROUP BY e.exam_id, e.exam_name, e.exam_date
+        ORDER BY e.exam_date ASC
+    ''', student_id)
+    exams = cursor.fetchall()
+    exam_labels = [f"{row[1]}({row[2]})" for row in exams] if exams else []
+    exam_ids = [row[0] for row in exams] if exams else []
+    # 查询所有学科
+    cursor.execute('''
+        SELECT DISTINCT s.subject_id, s.subject_name
+        FROM exam_score es
+        JOIN subject s ON es.subject_id = s.subject_id
+        WHERE es.student_id = ?
+        ORDER BY s.subject_id
+    ''', student_id)
+    subjects = cursor.fetchall()
+    chart_data = []
+    for sub in subjects:
+        subid, subname = sub
+        scores = []
+        for eid in exam_ids:
+            cursor.execute('''
+                SELECT score FROM exam_score WHERE student_id=? AND exam_id=? AND subject_id=?
+            ''', student_id, eid, subid)
+            r = cursor.fetchone()
+            scores.append(r[0] if r else None)
+        chart_data.append({'subject_id': subid, 'subject_name': subname, 'scores': scores})
+    conn.close()
+    return render_template('student/analysis.html', exam_labels=exam_labels, chart_data=chart_data)
+
+@app.route('/student/report')
+def student_report():
+    if session.get('role') != 'student':
+        return redirect(url_for('login'))
+    student_id = session.get('username')
+    exam_id = request.args.get('exam_id')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查询所有考试（按时间降序）
+    cursor.execute('''
+        SELECT DISTINCT e.exam_id, e.exam_name, e.exam_date
+        FROM exam_score es
+        JOIN exam e ON es.exam_id = e.exam_id
+        WHERE es.student_id = ?
+        ORDER BY e.exam_date DESC
+    ''', student_id)
+    exams = cursor.fetchall()
+    exam_list = [
+        {'exam_id': row[0], 'exam_name': row[1], 'exam_date': str(row[2])}
+        for row in exams
+    ]
+    # 默认选中最新一次考试
+    if not exam_id and exam_list:
+        exam_id = str(exam_list[0]['exam_id'])
+    # 查询该考试下所有学科及成绩
+    subjects, scores, reports = [], [], []
+    if exam_id:
+        # 先查考试日期
+        cursor.execute('SELECT exam_date FROM exam WHERE exam_id=?', exam_id)
+        exam_date_row = cursor.fetchone()
+        if exam_date_row:
+            from datetime import datetime, timedelta
+            exam_date = exam_date_row[0]
+            if isinstance(exam_date, str):
+                exam_date = datetime.strptime(exam_date, '%Y-%m-%d')
+            date_start = (exam_date - timedelta(days=3)).strftime('%Y-%m-%d')
+            date_end = (exam_date + timedelta(days=3)).strftime('%Y-%m-%d')
+        else:
+            date_start = date_end = None
+
+        # 查询所有学科、成绩、教师id、教师姓名
+        cursor.execute('''
+            SELECT s.subject_id, s.subject_name, es.score, t.teacher_id, t.name
+            FROM exam_score es
+            JOIN subject s ON es.subject_id = s.subject_id
+            LEFT JOIN teacher t ON t.subject_id = s.subject_id
+            WHERE es.student_id = ? AND es.exam_id = ?
+            ORDER BY s.subject_id
+        ''', student_id, exam_id)
+        rows = cursor.fetchall()
+
+        # 查询本学生在本考试前后3天内所有老师的报告，放入字典
+        report_dict = {}
+        if date_start and date_end:
+            cursor.execute('''
+                SELECT teacher_id, content FROM study_report WHERE student_id=? AND report_date>=? AND report_date<=?
+            ''', student_id, date_start, date_end)
+            for tid, content in cursor.fetchall():
+                report_dict[tid] = content
+
+        for row in rows:
+            subid, subname, score, tid, tname = row
+            subjects.append(subname)
+            scores.append(float(score) if score is not None else 0)
+            # 直接查字典
+            report_content = report_dict.get(tid)
+            if report_content:
+                reports.append({'subject': subname, 'teacher': tname, 'content': report_content})
+            else:
+                reports.append({'subject': subname, 'teacher': tname, 'content': '老师正在认真分析此次考试呦...'})
+    conn.close()
+    return render_template('student/report.html', 
+        exam_list=exam_list, 
+        selected_exam_id=exam_id, 
+        subjects=subjects, 
+        scores=scores,
+        reports=reports
+    )
 
 # 教师主页
 @app.route('/teacher')

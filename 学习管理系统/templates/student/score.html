@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>考试成绩查询</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
+        .sidebar .nav-link.active { background: #007bff; color: #fff !important; }
+        .content-area { padding: 2rem; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        {% include 'student/_sidebar.html' %}
+        <main class="col-md-10 ml-sm-auto content-area">
+            <!-- 成绩内容 -->
+            <div class="mb-3">
+              <form id="score-search-form" class="form-inline" method="get" action="/student/score">
+                <input type="text" class="form-control mr-2" name="kw" value="{{ kw|default('') }}" placeholder="输入考试名称关键词">
+                <button type="submit" class="btn btn-primary">搜索</button>
+                {% if kw %}
+                <a href="/student/score" class="btn btn-secondary ml-2">重置</a>
+                {% endif %}
+              </form>
+            </div>
+            {% if exam_list %}
+              {% for exam in exam_list %}
+                <div class="card mb-4">
+                  <div class="card-header bg-primary text-white">
+                    {{ exam.exam_name }}（{{ exam.exam_type }}）- {{ exam.exam_date }}
+                  </div>
+                  <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                      <thead class="thead-light">
+                        <tr>
+                          <th>科目</th>
+                          <th>成绩</th>
+                          <th>年级排名</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for s in exam.scores %}
+                        <tr>
+                          <td>{{ s.subject }}</td>
+                          <td>{{ s.score }}</td>
+                          <td>{{ s.ranking }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">暂无成绩数据。</div>
+            {% endif %}
+        </main>
+    </div>
+</div>
+</body>
+</html>
