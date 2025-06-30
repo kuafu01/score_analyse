@@ -16,26 +16,160 @@
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
             <h2 class="mb-4">班级成绩分析</h2>
+            <form method="get" class="form-inline mb-3" id="query-form">
+                <label class="mr-2">选择班级：</label>
+                <select name="class_id" class="form-control mr-3" id="class-select">
+                    <option value="">--请选择--</option>
+                    {% for c in class_list %}
+                        <option value="{{ c[0] }}" {% if selected_class==c[0] %}selected{% endif %}>{{ c[1] }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary mr-3">查询</button>
+                <label class="mr-2">选择考试：</label>
+                <select name="exam_id" class="form-control mr-3" id="exam-select" {% if not selected_class %}disabled{% endif %}>
+                    <option value="">--请选择--</option>
+                    {% for e in exam_list %}
+                        <option value="{{ e[0] }}" {% if selected_exam==e[0] %}selected{% endif %}>{{ e[1] }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+            <script>
+            $(function(){
+                $('#class-select').change(function(){
+                    var classId = $(this).val();
+                    if(!classId){
+                        $('#exam-select').html('<option value="">--请选择--</option>').prop('disabled',true);
+                        return;
+                    }
+                    $.get('/teacher/class/exams', {class_id:classId}, function(res){
+                        if(res.status==1){
+                            var html = '<option value="">--请选择--</option>';
+                            for(var i=0;i<res.exams.length;i++){
+                                html += '<option value="'+res.exams[i].id+'">'+res.exams[i].name+'</option>';
+                            }
+                            $('#exam-select').prop('disabled', false).html(html);
+                            // 自动选中第一个考试并自动提交
+                            if(res.exams.length>0){
+                                $('#exam-select').val(res.exams[0].id);
+                                setTimeout(function(){ $('#query-form').submit(); }, 0);
+                            }
+                        }
+                    });
+                });
+                $('#exam-select').change(function(){
+                    if($(this).val()){
+                        $('#query-form').submit();
+                    }
+                });
+            });
+            </script>
+            {% if scores %}
+            <h5>各科平均分</h5>
             <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
-                        <th>班级</th>
                         <th>学科</th>
-                        <th>考试名称</th>
                         <th>平均分</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                {% for row in class_scores %}
+                {% for row in scores %}
                     <tr>
                         <td>{{ row[0] }}</td>
-                        <td>{{ row[1] }}</td>
-                        <td>{{ row[2] }}</td>
-                        <td>{{ row[3]|round(2) }}</td>
+                        <td>{{ row[1]|round(2) }}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-info" onclick="showDetail('{{ row[0] }}')">查看详情</button>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <div id="detail-area" style="display:none;">
+                <h5 id="detail-title"></h5>
+                <div id="report-eval-area"></div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div id="pie-total" class="mb-1" style="font-weight:bold;"></div>
+                        <canvas id="pieChart"></canvas>
+                        <div id="pie-info" class="mt-2"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+            // 预加载所有学科的分布和波动数据
+            var subjectStats = {{ subject_stats|tojson }};
+            function showDetail(subjectName) {
+                var stat = subjectStats[subjectName];
+                if (!stat) return;
+                document.getElementById('detail-area').style.display = '';
+                document.getElementById('detail-title').innerText = subjectName + ' 详情';
+                // 评价表单
+                var classId = '{{ selected_class }}';
+                var examId = '{{ selected_exam }}';
+                var reportContent = '';
+                {% if report %} reportContent = `{{ report|replace('`','\`') }}`; {% endif %}
+                var evalHtml = `<form id='report-form' class='mb-3'>
+                    <input type='hidden' name='class_id' value='${classId}'>
+                    <input type='hidden' name='exam_id' value='${examId}'>
+                    <div class='form-group mb-2'>
+                        <label>班级成绩分析评价：</label>
+                        <textarea name='content' class='form-control' rows='2' placeholder='请输入本班本次考试的分析评价...'>${reportContent}</textarea>
+                    </div>
+                    <button type='submit' class='btn btn-success btn-sm'>保存评价</button>
+                    <span id='report-msg' class='ml-3 text-success'></span>
+                </form>`;
+                $('#report-eval-area').html(evalHtml);
+                $('#report-form').submit(function(e){
+                    e.preventDefault();
+                    var form = $(this);
+                    $.post('/teacher/class/report/update', form.serialize(), function(res){
+                        if(res.status==1){
+                            $('#report-msg').text('评价已保存！');
+                        }else{
+                            $('#report-msg').text(res.msg).removeClass('text-success').addClass('text-danger');
+                        }
+                    });
+                });
+                // 饼图
+                var total = stat.level_counts.reduce((a,b)=>a+b,0);
+                document.getElementById('pie-total').innerText = '总人数：' + total;
+                var percent = stat.level_counts.map(function(cnt){
+                    return total ? Math.round(cnt*100/total) : 0;
+                });
+                var pieLabels = stat.levels.map(function(lv,i){
+                    return lv + '(' + stat.level_counts[i] + '/' + percent[i] + '%)';
+                });
+                var pieCtx = document.getElementById('pieChart').getContext('2d');
+                if(window.pieChartObj) window.pieChartObj.destroy();
+                window.pieChartObj = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: pieLabels,
+                        datasets: [{ data: stat.level_counts, backgroundColor: ['#28a745','#007bff','#17a2b8','#dc3545'] }]
+                    },
+                    options: { title: { display: true, text: '成绩构成比例' } }
+                });
+                document.getElementById('pie-info').innerText = '';
+                // 折线图
+                var lineCtx = document.getElementById('lineChart').getContext('2d');
+                if(window.lineChartObj) window.lineChartObj.destroy();
+                window.lineChartObj = new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: stat.exam_names,
+                        datasets: [{ label: '均分', data: stat.exam_avgs, fill: false, borderColor: '#007bff' }]
+                    },
+                    options: { title: { display: true, text: '历次考试均分波动' } }
+                });
+            }
+            </script>
+            {% endif %}
         </main>
     </div>
 </div>

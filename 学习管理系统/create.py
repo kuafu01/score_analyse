@@ -52,10 +52,11 @@ def create_database_and_tables():
         "IF OBJECT_ID('teacher_class_subject', 'U') IS NOT NULL DROP TABLE teacher_class_subject;",
         "IF OBJECT_ID('study_report', 'U') IS NOT NULL DROP TABLE study_report;",
         "IF OBJECT_ID('exam_score', 'U') IS NOT NULL DROP TABLE exam_score;",
-        "IF OBJECT_ID('exam', 'U') IS NOT NULL DROP TABLE exam;",
+        "IF OBJECT_ID('class_exam_report', 'U') IS NOT NULL DROP TABLE class_exam_report;",
         "IF OBJECT_ID('student', 'U') IS NOT NULL DROP TABLE student;",
         "IF OBJECT_ID('class', 'U') IS NOT NULL DROP TABLE class;",
         "IF OBJECT_ID('teacher', 'U') IS NOT NULL DROP TABLE teacher;",
+        "IF OBJECT_ID('exam', 'U') IS NOT NULL DROP TABLE exam;",
         "IF OBJECT_ID('subject', 'U') IS NOT NULL DROP TABLE subject;",
         "IF OBJECT_ID('[user]', 'U') IS NOT NULL DROP TABLE [user];"
     ]

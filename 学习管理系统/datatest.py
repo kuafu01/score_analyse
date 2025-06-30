@@ -200,6 +200,31 @@ def insert_test_data():
     for scid, sid, eid, subid, score, rank, cdate in scores:
         cursor.execute("INSERT INTO exam_score (score_id, student_id, exam_id, subject_id, score, ranking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", scid, sid, eid, subid, score, rank, cdate)
 
+    # 7. 补充cl001班多学生多学科多分档成绩
+    more_scores = [
+        # s0002
+        ('sc1001', 's0002', 'ex001', 'c0001', 95, 1, '2025-04-10'),  # 语文A
+        ('sc1002', 's0002', 'ex001', 'c0002', 80, 2, '2025-04-10'),  # 数学B
+        ('sc1003', 's0002', 'ex001', 'c0003', 65, 3, '2025-04-10'),  # 英语C
+        ('sc1004', 's0002', 'ex002', 'c0001', 55, 4, '2025-06-20'),  # 语文D
+        ('sc1005', 's0002', 'ex002', 'c0002', 78, 2, '2025-06-20'),  # 数学B
+        ('sc1006', 's0002', 'ex002', 'c0003', 88, 1, '2025-06-20'),  # 英语A
+        ('sc1007', 's0002', 'ex003', 'c0001', 72, 3, '2025-03-05'),  # 语文C
+        ('sc1008', 's0002', 'ex003', 'c0002', 91, 1, '2025-03-05'),  # 数学A
+        ('sc1009', 's0002', 'ex003', 'c0003', 59, 4, '2025-03-05'),  # 英语D
+        # s0003
+        ('sc1010', 's0003', 'ex001', 'c0001', 77, 2, '2025-04-10'),  # 语文B
+        ('sc1011', 's0003', 'ex001', 'c0002', 62, 3, '2025-04-10'),  # 数学C
+        ('sc1012', 's0003', 'ex001', 'c0003', 58, 4, '2025-04-10'),  # 英语D
+        ('sc1013', 's0003', 'ex002', 'c0001', 89, 1, '2025-06-20'),  # 语文A
+        ('sc1014', 's0003', 'ex002', 'c0002', 74, 2, '2025-06-20'),  # 数学C
+        ('sc1015', 's0003', 'ex002', 'c0003', 79, 3, '2025-06-20'),  # 英语B
+        ('sc1016', 's0003', 'ex003', 'c0001', 61, 4, '2025-03-05'),  # 语文C
+        ('sc1017', 's0003', 'ex003', 'c0002', 55, 4, '2025-03-05'),  # 数学D
+        ('sc1018', 's0003', 'ex003', 'c0003', 92, 1, '2025-03-05'),  # 英语A
+    ]
+    for scid, sid, eid, subid, score, rank, cdate in more_scores:
+        cursor.execute("INSERT INTO exam_score (score_id, student_id, exam_id, subject_id, score, ranking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", scid, sid, eid, subid, score, rank, cdate)
     # 8. 学习报告
     # s0001每次考试每科均有报告，日期与考试日期一致
     reports = []
@@ -310,6 +335,43 @@ def insert_test_data():
     ]
     for rid, tid, cid, eid, content in class_exam_reports:
         cursor.execute("INSERT INTO class_exam_report (report_id, teacher_id, class_id, exam_id, content) VALUES (?, ?, ?, ?, ?)", rid, tid, cid, eid, content)
+
+    # t0010（体育教师，cl003班）补充体育成绩，覆盖A/B/C/D分布（全部在ex005高考模拟考）
+    pe_scores_ex005 = [
+        ('sc3001', 's0006', 'ex005', 'c0010', 95, 1, '2025-05-25'),  # A
+        ('sc3002', 's0007', 'ex005', 'c0010', 80, 2, '2025-05-25'),  # B
+        ('sc3003', 's0008', 'ex005', 'c0010', 65, 3, '2025-05-25'),  # C
+        ('sc3004', 's0009', 'ex005', 'c0010', 55, 4, '2025-05-25'),  # D
+    ]
+    for scid, sid, eid, subid, score, rank, cdate in pe_scores_ex005:
+        cursor.execute("INSERT INTO exam_score (score_id, student_id, exam_id, subject_id, score, ranking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", scid, sid, eid, subid, score, rank, cdate)
+
+    # cl003班体育多考试多学生多分档成绩，便于折线图展示
+    pe_scores_history = [
+        # ex001
+        ('sc4001', 's0006', 'ex001', 'c0010', 92, 1, '2025-04-10'),
+        ('sc4002', 's0007', 'ex001', 'c0010', 78, 2, '2025-04-10'),
+        ('sc4003', 's0008', 'ex001', 'c0010', 65, 3, '2025-04-10'),
+        ('sc4004', 's0009', 'ex001', 'c0010', 58, 4, '2025-04-10'),
+        # ex002
+        ('sc4005', 's0006', 'ex002', 'c0010', 88, 1, '2025-06-20'),
+        ('sc4006', 's0007', 'ex002', 'c0010', 75, 2, '2025-06-20'),
+        ('sc4007', 's0008', 'ex002', 'c0010', 62, 3, '2025-06-20'),
+        ('sc4008', 's0009', 'ex002', 'c0010', 55, 4, '2025-06-20'),
+        # ex003
+        ('sc4009', 's0006', 'ex003', 'c0010', 95, 1, '2025-03-05'),
+        ('sc4010', 's0007', 'ex003', 'c0010', 80, 2, '2025-03-05'),
+        ('sc4011', 's0008', 'ex003', 'c0010', 65, 3, '2025-03-05'),
+        ('sc4012', 's0009', 'ex003', 'c0010', 59, 4, '2025-03-05'),
+        # ex004
+        ('sc4013', 's0006', 'ex004', 'c0010', 90, 1, '2025-05-08'),
+        ('sc4014', 's0007', 'ex004', 'c0010', 76, 2, '2025-05-08'),
+        ('sc4015', 's0008', 'ex004', 'c0010', 61, 3, '2025-05-08'),
+        ('sc4016', 's0009', 'ex004', 'c0010', 56, 4, '2025-05-08'),
+        # ex005（已补充过A/B/C/D，略）
+    ]
+    for scid, sid, eid, subid, score, rank, cdate in pe_scores_history:
+        cursor.execute("INSERT INTO exam_score (score_id, student_id, exam_id, subject_id, score, ranking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", scid, sid, eid, subid, score, rank, cdate)
 
     conn.commit()
     cursor.close()

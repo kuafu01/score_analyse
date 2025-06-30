@@ -415,7 +415,7 @@ def teacher_evaluate():
 
 
 #班级成绩分析
-@app.route('/teacher/class')
+@app.route('/teacher/class', methods=['GET', 'POST'])
 def teacher_class():
     if session.get('role') != 'teacher':
         return redirect(url_for('login'))
@@ -427,24 +427,134 @@ def teacher_class():
     row = cursor.fetchone()
     if not row:
         conn.close()
-        return render_template('teacher/class.html', class_scores=[])
+        return render_template('teacher/class.html', class_list=[], exam_list=[], scores=[], report=None, selected_class=None, selected_exam=None)
     teacher_id = row[0]
-    # 查询该老师所教班级、学科、考试的学生成绩均分
+    # 查该老师所教班级
     cursor.execute('''
-        SELECT c.class_name, sub.subject_name, e.exam_name, AVG(es.score) as avg_score
+        SELECT DISTINCT c.class_id, c.class_name
         FROM teacher_class_subject tcs
         JOIN class c ON tcs.class_id = c.class_id
-        JOIN subject sub ON tcs.subject_id = sub.subject_id
-        JOIN exam_score es ON es.subject_id = sub.subject_id AND es.student_id IN (SELECT student_id FROM student WHERE class_id = c.class_id)
-        JOIN exam e ON es.exam_id = e.exam_id
         WHERE tcs.teacher_id = ?
-        GROUP BY c.class_name, sub.subject_name, e.exam_name
-        ORDER BY c.class_name, sub.subject_name, e.exam_name
+        ORDER BY c.class_id
     ''', teacher_id)
-    class_scores = cursor.fetchall()
-    conn.close()
-    return render_template('teacher/class.html', class_scores=class_scores)
+    class_list = cursor.fetchall()
+    # 查所有有成绩的考试（只显示该班级有成绩的考试）
+    exam_list = []
+    selected_class = request.values.get('class_id')
+    selected_exam = request.values.get('exam_id')
+    scores = []
+    report = None
+    if selected_class:
+        cursor.execute('''
+            SELECT DISTINCT e.exam_id, e.exam_name, e.exam_date
+            FROM exam_score es
+            JOIN exam e ON es.exam_id = e.exam_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ?
+            ORDER BY e.exam_date DESC
+        ''', selected_class)
+        exam_list = cursor.fetchall()
+    else:
+        exam_list = []
+    if selected_class and selected_exam:
+        # 查该班级该次考试各科均分
+        cursor.execute('''
+            SELECT sub.subject_name, AVG(es.score) as avg_score
+            FROM exam_score es
+            JOIN subject sub ON es.subject_id = sub.subject_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ? AND es.exam_id = ?
+            GROUP BY sub.subject_name
+            ORDER BY sub.subject_name
+        ''', selected_class, selected_exam)
+        scores = cursor.fetchall()
+        # 查班级分析报告
+        cursor.execute('''
+            SELECT content FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?
+        ''', teacher_id, selected_class, selected_exam)
+        report_row = cursor.fetchone()
+        report = report_row[0] if report_row else None
 
+        subject_stats = {}
+        if selected_class and selected_exam:
+            # 查所有学科
+            cursor.execute('''
+                SELECT DISTINCT sub.subject_name
+                FROM exam_score es
+                JOIN subject sub ON es.subject_id = sub.subject_id
+                JOIN student s ON es.student_id = s.student_id
+                WHERE s.class_id = ? AND es.exam_id = ?
+            ''', selected_class, selected_exam)
+            subject_names = [row[0] for row in cursor.fetchall()]
+            for subject in subject_names:
+                # 1. 成绩分布
+                cursor.execute('''
+                    SELECT es.score
+                    FROM exam_score es
+                    JOIN subject sub ON es.subject_id = sub.subject_id
+                    JOIN student s ON es.student_id = s.student_id
+                    WHERE s.class_id = ? AND es.exam_id = ? AND sub.subject_name = ?
+                ''', selected_class, selected_exam, subject)
+                scores_list = [float(r[0]) for r in cursor.fetchall()]
+                levels = ['A', 'B', 'C', 'D']
+                level_counts = [0, 0, 0, 0]
+                for score in scores_list:
+                    if score >= 90:
+                        level_counts[0] += 1
+                    elif score >= 75:
+                        level_counts[1] += 1
+                    elif score >= 60:
+                        level_counts[2] += 1
+                    else:
+                        level_counts[3] += 1
+                # 2. 历次考试均分
+                cursor.execute('''
+                    SELECT e.exam_name, AVG(es.score)
+                    FROM exam_score es
+                    JOIN exam e ON es.exam_id = e.exam_id
+                    JOIN subject sub ON es.subject_id = sub.subject_id
+                    JOIN student s ON es.student_id = s.student_id
+                    WHERE s.class_id = ? AND sub.subject_name = ?
+                    GROUP BY e.exam_name, e.exam_date
+                    ORDER BY e.exam_date
+                ''', selected_class, subject)
+                exam_rows = cursor.fetchall()
+                exam_names = [r[0] for r in exam_rows]
+                exam_avgs = [float(r[1]) if r[1] is not None else 0 for r in exam_rows]
+                subject_stats[subject] = {
+                    'levels': levels,
+                    'level_counts': level_counts,
+                    'exam_names': exam_names,
+                    'exam_avgs': exam_avgs
+                }
+        else:
+            subject_stats = {}
+    else:
+        subject_stats = {}
+    conn.close()
+    return render_template('teacher/class.html', class_list=class_list, exam_list=exam_list, scores=scores, report=report, selected_class=selected_class, selected_exam=selected_exam, subject_stats=subject_stats)
+
+
+@app.route('/teacher/class/exams')
+def teacher_class_exams():
+    if session.get('role') != 'teacher':
+        return {'status': 0, 'msg': '未登录'}
+    class_id = request.args.get('class_id')
+    if not class_id:
+        return {'status': 0, 'msg': '缺少参数'}
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DISTINCT e.exam_id, e.exam_name
+        FROM exam_score es
+        JOIN exam e ON es.exam_id = e.exam_id
+        JOIN student s ON es.student_id = s.student_id
+        WHERE s.class_id = ?
+        ORDER BY e.exam_date DESC
+    ''', class_id)
+    exams = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+    conn.close()
+    return {'status': 1, 'exams': exams}
 
 @app.route('/teacher/evaluate/update', methods=['POST'])
 def teacher_evaluate_update():
