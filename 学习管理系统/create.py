@@ -144,6 +144,19 @@ def create_database_and_tables():
             FOREIGN KEY (class_id) REFERENCES class(class_id),
             FOREIGN KEY (subject_id) REFERENCES subject(subject_id)
         )''',
+        '''CREATE TABLE class_exam_report (
+            report_id VARCHAR(20) PRIMARY KEY,
+            teacher_id VARCHAR(10) NOT NULL,
+            class_id VARCHAR(10) NOT NULL,
+            exam_id VARCHAR(10) NOT NULL,
+            content TEXT,
+            created_at DATETIME DEFAULT GETDATE(),
+            updated_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id),
+            FOREIGN KEY (class_id) REFERENCES class(class_id),
+            FOREIGN KEY (exam_id) REFERENCES exam(exam_id),
+            CONSTRAINT UQ_class_exam_report UNIQUE (teacher_id, class_id, exam_id)
+        )''',
         'CREATE INDEX idx_exam_score_student_exam ON exam_score(student_id, exam_id);',
         'CREATE INDEX idx_study_report_report_date ON study_report(report_date);'
     ]

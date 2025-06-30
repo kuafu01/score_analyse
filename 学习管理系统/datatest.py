@@ -296,6 +296,21 @@ def insert_test_data():
     for relid, tid, cid, subid in tcs:
         cursor.execute("INSERT INTO teacher_class_subject (relation_id, teacher_id, class_id, subject_id) VALUES (?, ?, ?, ?)", relid, tid, cid, subid)
 
+    # 10. 班级成绩分析报告
+    class_exam_reports = [
+        ('cr001', 't0001', 'cl001', 'ex001', '高一(1)班2025期中考试整体表现良好，语文平均分85，数学突出，需加强英语学习。'),
+        ('cr002', 't0001', 'cl001', 'ex002', '高一(1)班2025期末考试整体进步明显，数学和物理成绩提升较大。'),
+        ('cr003', 't0002', 'cl002', 'ex001', '高一(2)班2025期中考试整体成绩中等，部分学生需加强基础知识。'),
+        ('cr004', 't0003', 'cl003', 'ex003', '高二(1)班2025年3月月考理科成绩优秀，文科需提升。'),
+        # 新增数据
+        ('cr005', 't0002', 'cl002', 'ex002', '高一(2)班2025期末考试整体进步，数学平均分提升，英语仍需努力。'),
+        ('cr006', 't0003', 'cl003', 'ex004', '高二(1)班2025年5月月考班级整体稳定，部分学生成绩波动较大。'),
+        ('cr007', 't0001', 'cl001', 'ex003', '高一(1)班2025年3月月考语文成绩优秀，需关注理科短板。'),
+        ('cr008', 't0004', 'cl002', 'ex001', '高一(2)班物理成绩整体良好，实验题得分高。')
+    ]
+    for rid, tid, cid, eid, content in class_exam_reports:
+        cursor.execute("INSERT INTO class_exam_report (report_id, teacher_id, class_id, exam_id, content) VALUES (?, ?, ?, ?, ?)", rid, tid, cid, eid, content)
+
     conn.commit()
     cursor.close()
     conn.close()
