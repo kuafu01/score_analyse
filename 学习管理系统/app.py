@@ -293,7 +293,7 @@ def student_report():
 #
 #
 ################################
-# 教师主页
+
 @app.route('/teacher/profile')
 def teacher_profile():
     if session.get('role') != 'teacher':
@@ -383,8 +383,7 @@ def teacher_score():
     #print('scores:', scores)
     return render_template('teacher/score.html', scores=scores)
 
-#学生成绩评价evalute
-@app.route('/teacher/evaluate')
+@app.route('/teacher/evaluate', methods=['GET'])
 def teacher_evaluate():
     if session.get('role') != 'teacher':
         return redirect(url_for('login'))
@@ -395,41 +394,8 @@ def teacher_evaluate():
     row = cursor.fetchone()
     if not row:
         conn.close()
-        return render_template('teacher/evaluate.html', scores=[])
+        return render_template('teacher/evaluate.html', class_list=[], students=[], selected_class=None)
     teacher_id = row[0]
-    cursor.execute('''
-        SELECT s.student_id, s.name, c.class_name, sub.subject_name, e.exam_name, es.score, sr.content
-        FROM teacher_class_subject tcs
-        JOIN class c ON tcs.class_id = c.class_id
-        JOIN student s ON s.class_id = c.class_id
-        JOIN subject sub ON tcs.subject_id = sub.subject_id
-        JOIN exam_score es ON es.student_id = s.student_id AND es.subject_id = sub.subject_id
-        JOIN exam e ON es.exam_id = e.exam_id
-        LEFT JOIN study_report sr ON sr.student_id = s.student_id AND sr.teacher_id = tcs.teacher_id AND sr.report_date = e.exam_date
-        WHERE tcs.teacher_id = ?
-        ORDER BY c.class_name, s.name, sub.subject_name, e.exam_date DESC
-    ''', teacher_id)
-    scores = cursor.fetchall()
-    conn.close()
-    return render_template('teacher/evaluate.html', scores=scores)
-
-
-#班级成绩分析
-@app.route('/teacher/class', methods=['GET', 'POST'])
-def teacher_class():
-    if session.get('role') != 'teacher':
-        return redirect(url_for('login'))
-    teacher_name = session.get('name')
-    conn = get_conn()
-    cursor = conn.cursor()
-    # 查teacher_id
-    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
-        return render_template('teacher/class.html', class_list=[], exam_list=[], scores=[], report=None, selected_class=None, selected_exam=None)
-    teacher_id = row[0]
-    # 查该老师所教班级
     cursor.execute('''
         SELECT DISTINCT c.class_id, c.class_name
         FROM teacher_class_subject tcs
@@ -438,7 +404,127 @@ def teacher_class():
         ORDER BY c.class_id
     ''', teacher_id)
     class_list = cursor.fetchall()
-    # 查所有有成绩的考试（只显示该班级有成绩的考试）
+    selected_class = request.args.get('class_id')
+    students = []
+    if selected_class:
+        cursor.execute('''
+            SELECT s.student_id, s.name, c.class_name
+            FROM student s
+            JOIN class c ON s.class_id = c.class_id
+            WHERE s.class_id = ?
+            ORDER BY s.name
+        ''', selected_class)
+        students = cursor.fetchall()
+    conn.close()
+    return render_template('teacher/evaluate.html', class_list=class_list, students=students, selected_class=selected_class)
+
+@app.route('/teacher/evaluate/student/<student_id>', methods=['GET'])
+def teacher_evaluate_student(student_id):
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT s.name, c.class_name FROM student s JOIN class c ON s.class_id = c.class_id WHERE s.student_id=?
+    ''', student_id)
+    stu_row = cursor.fetchone()
+    if not stu_row:
+        conn.close()
+        return '学生不存在'
+    stu_name, class_name = stu_row
+    cursor.execute('''
+        SELECT e.exam_id, e.exam_name, e.exam_date FROM exam_score es JOIN exam e ON es.exam_id = e.exam_id WHERE es.student_id=? GROUP BY e.exam_id, e.exam_name, e.exam_date ORDER BY e.exam_date DESC
+    ''', student_id)
+    exams = cursor.fetchall()
+    cursor.execute('''
+        SELECT DISTINCT s.subject_id, s.subject_name FROM exam_score es JOIN subject s ON es.subject_id = s.subject_id WHERE es.student_id=? ORDER BY s.subject_id
+    ''', student_id)
+    subjects = cursor.fetchall()
+    exam_data = []
+    for eid, ename, edate in exams:
+        row = {'exam_id': eid, 'exam_name': ename, 'exam_date': edate, 'scores': [], 'report': ''}
+        for subid, subname in subjects:
+            cursor.execute('SELECT score FROM exam_score WHERE student_id=? AND exam_id=? AND subject_id=?', student_id, eid, subid)
+            r = cursor.fetchone()
+            row['scores'].append({'subject': subname, 'score': r[0] if r else None})
+        cursor.execute('SELECT content FROM study_report WHERE student_id=? AND report_date=? AND teacher_id=(SELECT teacher_id FROM teacher WHERE name=?)', student_id, edate, teacher_name)
+        rep = cursor.fetchone()
+        row['report'] = rep[0] if rep else ''
+        # 查询班级均分
+        cursor.execute('''
+            SELECT AVG(score) FROM exam_score WHERE exam_id=? AND subject_id IN (SELECT subject_id FROM exam_score WHERE student_id=?) AND student_id IN (SELECT student_id FROM student WHERE class_id=(SELECT class_id FROM student WHERE student_id=?))
+        ''', eid, student_id, student_id)
+        avg_score = cursor.fetchone()[0]
+        row['class_avg'] = round(avg_score, 2) if avg_score is not None else None
+        # 查询本班所有学生该次考试总分
+        cursor.execute('''
+            SELECT s.student_id, SUM(es.score) as total
+            FROM student s
+            JOIN exam_score es ON s.student_id = es.student_id
+            WHERE s.class_id = (SELECT class_id FROM student WHERE student_id=?) AND es.exam_id = ?
+            GROUP BY s.student_id
+        ''', student_id, eid)
+        row['class_scores'] = [{'student_id': r[0], 'total': float(r[1]) if r[1] is not None else 0} for r in cursor.fetchall()]
+        exam_data.append(row)
+    conn.close()
+    return render_template('teacher/evaluate_student.html', stu_name=stu_name, class_name=class_name, exam_data=exam_data, student_id=student_id)
+
+@app.route('/teacher/evaluate/report/update', methods=['POST'])
+def teacher_evaluate_report_update():
+    if session.get('role') != 'teacher':
+        return {'status': 0, 'msg': '未登录'}
+    teacher_name = session.get('name')
+    student_id = request.form.get('student_id')
+    exam_date = request.form.get('exam_date')
+    content = request.form.get('content', '').strip()
+    if not (student_id and exam_date and content):
+        return {'status': 0, 'msg': '参数不完整'}
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {'status': 0, 'msg': '教师不存在'}
+    teacher_id = row[0]
+    cursor.execute('SELECT report_id FROM study_report WHERE student_id=? AND teacher_id=? AND report_date=?', student_id, teacher_id, exam_date)
+    r = cursor.fetchone()
+    if r:
+        cursor.execute('UPDATE study_report SET content=? WHERE report_id=?', content, r[0])
+    else:
+        import uuid
+        report_id = str(uuid.uuid4())[:20]
+        cursor.execute('INSERT INTO study_report (report_id, student_id, teacher_id, report_date, content, evaluation_level) VALUES (?, ?, ?, ?, ?, ?)', report_id, student_id, teacher_id, exam_date, content, None)
+    conn.commit()
+    conn.close()
+    return {'status': 1, 'msg': '评价已保存'}
+
+
+
+
+    
+@app.route('/teacher/class', methods=['GET', 'POST'])
+def teacher_class():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('teacher/class.html', class_list=[], exam_list=[], scores=[], report=None, selected_class=None, selected_exam=None)
+    teacher_id = row[0]
+    cursor.execute('''
+        SELECT DISTINCT c.class_id, c.class_name
+        FROM teacher_class_subject tcs
+        JOIN class c ON tcs.class_id = c.class_id
+        WHERE tcs.teacher_id = ?
+        ORDER BY c.class_id
+    ''', teacher_id)
+    class_list = cursor.fetchall()
     exam_list = []
     selected_class = request.values.get('class_id')
     selected_exam = request.values.get('exam_id')
@@ -457,7 +543,6 @@ def teacher_class():
     else:
         exam_list = []
     if selected_class and selected_exam:
-        # 查该班级该次考试各科均分
         cursor.execute('''
             SELECT sub.subject_name, AVG(es.score) as avg_score
             FROM exam_score es
@@ -468,16 +553,13 @@ def teacher_class():
             ORDER BY sub.subject_name
         ''', selected_class, selected_exam)
         scores = cursor.fetchall()
-        # 查班级分析报告
         cursor.execute('''
             SELECT content FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?
         ''', teacher_id, selected_class, selected_exam)
         report_row = cursor.fetchone()
         report = report_row[0] if report_row else None
-
         subject_stats = {}
         if selected_class and selected_exam:
-            # 查所有学科
             cursor.execute('''
                 SELECT DISTINCT sub.subject_name
                 FROM exam_score es
@@ -487,7 +569,6 @@ def teacher_class():
             ''', selected_class, selected_exam)
             subject_names = [row[0] for row in cursor.fetchall()]
             for subject in subject_names:
-                # 1. 成绩分布
                 cursor.execute('''
                     SELECT es.score
                     FROM exam_score es
@@ -507,7 +588,6 @@ def teacher_class():
                         level_counts[2] += 1
                     else:
                         level_counts[3] += 1
-                # 2. 历次考试均分
                 cursor.execute('''
                     SELECT e.exam_name, AVG(es.score)
                     FROM exam_score es
@@ -533,70 +613,6 @@ def teacher_class():
         subject_stats = {}
     conn.close()
     return render_template('teacher/class.html', class_list=class_list, exam_list=exam_list, scores=scores, report=report, selected_class=selected_class, selected_exam=selected_exam, subject_stats=subject_stats)
-
-
-@app.route('/teacher/class/exams')
-def teacher_class_exams():
-    if session.get('role') != 'teacher':
-        return {'status': 0, 'msg': '未登录'}
-    class_id = request.args.get('class_id')
-    if not class_id:
-        return {'status': 0, 'msg': '缺少参数'}
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT DISTINCT e.exam_id, e.exam_name
-        FROM exam_score es
-        JOIN exam e ON es.exam_id = e.exam_id
-        JOIN student s ON es.student_id = s.student_id
-        WHERE s.class_id = ?
-        ORDER BY e.exam_date DESC
-    ''', class_id)
-    exams = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-    conn.close()
-    return {'status': 1, 'exams': exams}
-
-@app.route('/teacher/evaluate/update', methods=['POST'])
-def teacher_evaluate_update():
-    if session.get('role') != 'teacher':
-        return redirect(url_for('login'))
-    student_id = request.form['student_id']
-    subject_name = request.form['subject_name']
-    exam_name = request.form['exam_name']
-    content = request.form['content']
-    teacher_name = session.get('name')
-    conn = get_conn()
-    cursor = conn.cursor()
-    # 查subject_id, exam_id, teacher_id
-    cursor.execute('SELECT subject_id FROM subject WHERE subject_name=?', subject_name)
-    subject_row = cursor.fetchone()
-    cursor.execute('SELECT exam_id, exam_date FROM exam WHERE exam_name=?', exam_name)
-    exam_row = cursor.fetchone()
-    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
-    teacher_row = cursor.fetchone()
-    if not (subject_row and exam_row and teacher_row):
-        conn.close()
-        flash('参数错误', 'danger')
-        return redirect(url_for('teacher_evaluate'))
-    subject_id = subject_row[0]
-    exam_id, exam_date = exam_row
-    teacher_id = teacher_row[0]
-    # 查是否已有评价
-    cursor.execute('SELECT report_id FROM study_report WHERE student_id=? AND teacher_id=? AND report_date=?', student_id, teacher_id, exam_date)
-    report = cursor.fetchone()
-    if report:
-        cursor.execute('UPDATE study_report SET content=? WHERE report_id=?', content, report[0])
-    else:
-        import uuid
-        report_id = str(uuid.uuid4())[:20]
-        cursor.execute('INSERT INTO study_report (report_id, student_id, teacher_id, report_date, content, evaluation_level) VALUES (?, ?, ?, ?, ?, ?)',
-                       report_id, student_id, teacher_id, exam_date, content, None)
-    conn.commit()
-    conn.close()
-    flash('评价已保存', 'success')
-    return redirect(url_for('teacher_evaluate'))
-
-
 
 ##########################
 #
