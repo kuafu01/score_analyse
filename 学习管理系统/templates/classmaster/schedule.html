@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>班级课表</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
+        .content-area { padding: 2rem; }
+        .schedule-card {
+            background: linear-gradient(135deg, #e3f0ff 0%, #f8fbff 100%);
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            padding: 2rem 2.5rem 2rem 2.5rem;
+            margin-bottom: 2rem;
+        }
+        .schedule-table {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+        }
+        .schedule-table th, .schedule-table td {
+            border: 1.5px solid #b6d0f7;
+            min-width: 90px;
+            height: 60px;
+            vertical-align: middle;
+            font-size: 1.05rem;
+            background: #fafdff;
+        }
+        .schedule-table th {
+            background: linear-gradient(90deg, #6fa8ff 0%, #a7d8ff 100%);
+            color: #fff;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        .schedule-table td {
+            background: #fafdff;
+            transition: background 0.2s;
+        }
+        .schedule-table td:hover {
+            background: #e3f0ff;
+        }
+        .schedule-view {
+            display: block;
+            font-size: 1.08rem;
+            color: #3a4a6b;
+            font-weight: 500;
+        }
+        .teacher-name-text {
+            color: #6fa8ff;
+            font-size: 0.98rem;
+            font-weight: 500;
+            margin-left: 2px;
+        }
+        .btn-primary, .btn-outline-primary {
+            background: linear-gradient(90deg, #6fa8ff 0%, #a7d8ff 100%);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(111,168,255,0.08);
+        }
+        .btn-outline-primary {
+            background: #fff;
+            color: #6fa8ff;
+            border: 1.5px solid #6fa8ff;
+        }
+        .btn-primary:hover, .btn-outline-primary:hover {
+            background: linear-gradient(90deg, #4e8be6 0%, #6fa8ff 100%);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        {% include 'classmaster/_sidebar.html' %}
+        <main class="col-md-10 ml-sm-auto content-area">
+            <div class="schedule-card">
+                <div class="d-flex align-items-center mb-3">
+                    <h2 style="color:#3a4a6b;font-weight:700;">班级课表</h2>
+                </div>
+                <form method="get" class="mb-3 d-flex align-items-center">
+                    <label for="classSelect" class="form-label me-2">选择班级：</label>
+                    <select id="classSelect" name="class_id" class="form-select me-3" style="width:auto;display:inline-block" onchange="this.form.submit()">
+                        {% for c in classes %}
+                        <option value="{{ c.class_id }}" {% if c.class_id==current_class_id %}selected{% endif %}>{{ c.class_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-check form-switch ms-3">
+                        <input class="form-check-input" type="checkbox" id="onlySelfSwitch" name="only_self" value="1" {% if only_self %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="form-check-label" for="onlySelfSwitch">只看自己所授科目</label>
+                    </div>
+                </form>
+                <div class="table-responsive">
+                <table class="table schedule-table text-center align-middle">
+                    <thead>
+                        <tr>
+                            <th>节次/星期</th>
+                            {% for w in weekdays %}<th>周{{ w }}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for period in periods %}
+                        <tr>
+                            <th>
+                                {{ period }}<br>
+                                <span style="font-size:0.92em;color:#fff;font-weight:400;">
+                                    {% if period == 1 %}08:00-08:45{% elif period == 2 %}08:55-09:40{% elif period == 3 %}10:00-10:45{% elif period == 4 %}10:55-11:40{% elif period == 5 %}14:00-14:45{% elif period == 6 %}14:55-15:40{% elif period == 7 %}16:00-16:45{% elif period == 8 %}16:55-17:40{% endif %}
+                                </span>
+                            </th>
+                            {% for wi in range(1, 8) %}
+                            {% set cell = schedule_map.get((wi, period)) %}
+                            <td>
+                                <span class="schedule-view" {% if not cell %}style="color:#bbb;"{% endif %}>
+                                    {% if cell %}
+                                        {{ subjects|selectattr('subject_id', 'equalto', cell.subject_id)|map(attribute='subject_name')|first }}<br>
+                                        <span class="teacher-name-text">{{ teachers|selectattr('teacher_id', 'equalto', cell.teacher_id)|map(attribute='name')|first }}</span>
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                <div class="text-muted mt-2" style="font-size:0.98em;">* 仅可查看课表，不能编辑</div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

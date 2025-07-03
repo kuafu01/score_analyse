@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}用户详情 - 学习管理系统{% endblock %}
+{% block content %}
+<div class="content-header">
+    <h2><i class="fas fa-id-card"></i> 用户详情</h2>
+</div>
+<div class="content-body">
+    <div class="card" style="max-width:600px;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        {% if user_type == 'student' and user %}
+        <div class="card-header bg-primary text-white"><i class="fas fa-user-graduate"></i> 学生信息</div>
+        <div class="card-body">
+            <table class="table table-bordered mb-0">
+                <tr><th>学号</th><td>{{ user.student_id }}</td></tr>
+                <tr><th>姓名</th><td>{{ user.name }}</td></tr>
+                <tr><th>性别</th><td>{{ user.gender }}</td></tr>
+                <tr><th>出生日期</th><td>{{ user.birth_date }}</td></tr>
+                <tr><th>民族</th><td>{{ user.nation }}</td></tr>
+                <tr><th>省份</th><td>{{ user.province }}</td></tr>
+                <tr><th>政治面貌</th><td>{{ user.political_status }}</td></tr>
+                <tr><th>班级</th><td>{{ user.class_name }}</td></tr>
+                <tr><th>联系电话</th><td>{{ user.contact_phone }}</td></tr>
+                <tr><th>紧急联系人</th><td>{{ user.emergency_contact }}</td></tr>
+            </table>
+        </div>
+        {% elif user_type == 'teacher' and user %}
+        <div class="card-header bg-success text-white"><i class="fas fa-chalkboard-teacher"></i> 教师信息</div>
+        <div class="card-body">
+            <table class="table table-bordered mb-0">
+                <tr><th>工号</th><td>{{ user.teacher_id }}</td></tr>
+                <tr><th>姓名</th><td>{{ user.name }}</td></tr>
+                <tr><th>性别</th><td>{{ user.gender }}</td></tr>
+                <tr><th>职称</th><td>{{ user.title }}</td></tr>
+                <tr><th>邮箱</th><td>{{ user.contact_email }}</td></tr>
+                <tr><th>办公室</th><td>{{ user.office_address }}</td></tr>
+                <tr><th>联系电话</th><td>{{ user.phone }}</td></tr>
+            </table>
+        </div>
+        {% elif user_type == 'admin' and user %}
+        <div class="card-header bg-warning text-dark"><i class="fas fa-user-cog"></i> 管理员信息</div>
+        <div class="card-body">
+            <table class="table table-bordered mb-0">
+                <tr><th>管理员编号</th><td>{{ user.cno }}</td></tr>
+                <tr><th>姓名</th><td>{{ user.cname }}</td></tr>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning m-4">未找到用户信息</div>
+        {% endif %}
+        <div class="card-footer text-center bg-light">
+            <a href="{{ url_for('admin_manage_users') }}" class="btn btn-secondary">返回</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

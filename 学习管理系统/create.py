@@ -47,17 +47,33 @@ def create_database_and_tables():
         except Exception as e:
             print(f"删除索引失败: {e}")
 
+
+    # 先删除所有外键约束
+    try:
+        cursor.execute('''
+        DECLARE @sql NVARCHAR(MAX) = N'';
+        SELECT @sql += N'ALTER TABLE [' + OBJECT_SCHEMA_NAME(parent_object_id) + '].[' + OBJECT_NAME(parent_object_id) + '] DROP CONSTRAINT [' + name + '];\n'
+        FROM sys.foreign_keys;
+        EXEC sp_executesql @sql;
+        ''')
+        print("所有外键约束已删除。")
+    except Exception as e:
+        print(f"删除外键约束失败: {e}")
+
     # 再按外键依赖顺序删除表（如存在）
     drop_table_cmds = [
         "IF OBJECT_ID('teacher_class_subject', 'U') IS NOT NULL DROP TABLE teacher_class_subject;",
         "IF OBJECT_ID('study_report', 'U') IS NOT NULL DROP TABLE study_report;",
         "IF OBJECT_ID('exam_score', 'U') IS NOT NULL DROP TABLE exam_score;",
+        "IF OBJECT_ID('class_exam_report', 'U') IS NOT NULL DROP TABLE class_exam_report;",
+        "IF OBJECT_ID('schedule', 'U') IS NOT NULL DROP TABLE schedule;",
         "IF OBJECT_ID('exam', 'U') IS NOT NULL DROP TABLE exam;",
         "IF OBJECT_ID('student', 'U') IS NOT NULL DROP TABLE student;",
         "IF OBJECT_ID('class', 'U') IS NOT NULL DROP TABLE class;",
         "IF OBJECT_ID('teacher', 'U') IS NOT NULL DROP TABLE teacher;",
         "IF OBJECT_ID('subject', 'U') IS NOT NULL DROP TABLE subject;",
-        "IF OBJECT_ID('[user]', 'U') IS NOT NULL DROP TABLE [user];"
+        "IF OBJECT_ID('[user]', 'U') IS NOT NULL DROP TABLE [user];",
+        "IF OBJECT_ID('administrator', 'U') IS NOT NULL DROP TABLE administrator;"
     ]
     for cmd in drop_table_cmds:
         try:
@@ -66,6 +82,10 @@ def create_database_and_tables():
             print(f"删除表失败: {e}")
 
     sql_commands = [
+        '''CREATE TABLE administrator (
+            cno VARCHAR(20) PRIMARY KEY,
+            cname VARCHAR(20) NOT NULL
+        )''',
         '''CREATE TABLE [user] (
             user_id VARCHAR(20) PRIMARY KEY,
             username VARCHAR(80) NOT NULL UNIQUE,
@@ -82,10 +102,14 @@ def create_database_and_tables():
         '''CREATE TABLE teacher (
             teacher_id VARCHAR(10) PRIMARY KEY,
             name VARCHAR(50) NOT NULL,
+            gender VARCHAR(10) CHECK (gender IN ('男','女','其他')),
             title VARCHAR(20),
             subject_id VARCHAR(10),
             contact_email VARCHAR(50),
+            office_address VARCHAR(100),
+            phone VARCHAR(20),
             is_head_teacher BIT DEFAULT 0,
+            created_at DATETIME DEFAULT GETDATE(),
             FOREIGN KEY (subject_id) REFERENCES subject(subject_id)
         )''',
         '''CREATE TABLE class (
@@ -100,6 +124,9 @@ def create_database_and_tables():
             name VARCHAR(50) NOT NULL,
             gender VARCHAR(10) CHECK (gender IN ('男','女','其他')),
             birth_date DATE,
+            nation VARCHAR(20),
+            province VARCHAR(20),
+            political_status VARCHAR(10) CHECK (political_status IN ('群众','团员')),
             class_id VARCHAR(10) NOT NULL,
             contact_phone VARCHAR(20),
             emergency_contact VARCHAR(50),
@@ -143,6 +170,33 @@ def create_database_and_tables():
             FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id),
             FOREIGN KEY (class_id) REFERENCES class(class_id),
             FOREIGN KEY (subject_id) REFERENCES subject(subject_id)
+        )''',
+        '''CREATE TABLE class_exam_report (
+            report_id VARCHAR(20) PRIMARY KEY,
+            teacher_id VARCHAR(10) NOT NULL,
+            class_id VARCHAR(10) NOT NULL,
+            exam_id VARCHAR(10) NOT NULL,
+            content TEXT,
+            created_at DATETIME DEFAULT GETDATE(),
+            updated_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id),
+            FOREIGN KEY (class_id) REFERENCES class(class_id),
+            FOREIGN KEY (exam_id) REFERENCES exam(exam_id),
+            CONSTRAINT UQ_class_exam_report UNIQUE (teacher_id, class_id, exam_id)
+        )''',
+        '''CREATE TABLE schedule (
+            schedule_id INT IDENTITY(1,1) PRIMARY KEY,
+            class_id VARCHAR(10) NOT NULL,
+            week_day INT NOT NULL CHECK (week_day BETWEEN 1 AND 7), -- 1=周一, 7=周日
+            period INT NOT NULL CHECK (period BETWEEN 1 AND 8), -- 1-4上午, 5-8下午
+            subject_id VARCHAR(10) NOT NULL,
+            teacher_id VARCHAR(10) NOT NULL,
+            classroom VARCHAR(30),
+            remark VARCHAR(100),
+            CONSTRAINT UQ_schedule UNIQUE (class_id, week_day, period),
+            FOREIGN KEY (class_id) REFERENCES class(class_id),
+            FOREIGN KEY (subject_id) REFERENCES subject(subject_id),
+            FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id)
         )''',
         'CREATE INDEX idx_exam_score_student_exam ON exam_score(student_id, exam_id);',
         'CREATE INDEX idx_study_report_report_date ON study_report(report_date);'

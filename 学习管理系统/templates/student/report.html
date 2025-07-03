@@ -54,9 +54,9 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <div class="card">
-                            <div class="card-header bg-success text-white">成绩占比饼状图</div>
+                            <div class="card-header bg-info text-white">成绩十边形图</div>
                             <div class="card-body">
-                                <canvas id="report-pie-chart" height="220"></canvas>
+                                <canvas id="report-polygon-chart" height="220"></canvas>
                             </div>
                         </div>
                     </div>
@@ -112,34 +112,37 @@
                     }
                 }
             });
-            // 饼状图
-            const pieCtx = document.getElementById('report-pie-chart').getContext('2d');
-            const total = scores.reduce((a, b) => a + b, 0) || 1;
-            new Chart(pieCtx, {
-                type: 'pie',
+            // 十边形雷达图
+            const polygonCtx = document.getElementById('report-polygon-chart').getContext('2d');
+            new Chart(polygonCtx, {
+                type: 'radar',
                 data: {
                     labels: subjects,
                     datasets: [{
-                        label: '占比',
-                        data: scores.map(s => (s / total * 100).toFixed(2)),
-                        backgroundColor: [
-                            '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#343a40'
-                        ]
+                        label: '成绩',
+                        data: scores,
+                        backgroundColor: 'rgba(23,162,184,0.2)',
+                        borderColor: '#17a2b8',
+                        pointBackgroundColor: '#17a2b8',
+                        borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: { display: true, position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.label || '';
-                                    let value = context.raw || 0;
-                                    return `${label}: ${value}%`;
-                                }
-                            }
+                    scales: {
+                        r: {
+                            angleLines: { display: true },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            min: 0,
+                            max: 100,
+                            pointLabels: { font: { size: 14 } },
+                            ticks: { stepSize: 10, color: '#888' }
                         }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: true }
                     }
                 }
             });

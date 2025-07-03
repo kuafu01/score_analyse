@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>学生学习情况</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
+        .content-area { padding: 2rem; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        {% include 'classmaster/_sidebar.html' %}
+        <main class="col-md-10 ml-sm-auto content-area">
+            <h2 class="mb-4">学生学习情况{% if class_name %} - {{ class_name }}{% endif %}</h2>
+            <form method="get" class="form-inline mb-3">
+                <input type="text" name="kw" class="form-control mr-2" placeholder="输入学生姓名搜索" value="{{ kw|default('') }}">
+                <button type="submit" class="btn btn-primary">搜索</button>
+            </form>
+            <div class="row">
+                <div class="col-md-4 student-list" style="max-height:70vh;overflow-y:auto;">
+                    <ul class="list-group">
+                        {% for stu in students %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center {% if selected_student and stu.student_id == selected_student.student_id %}active{% endif %}">
+                            <span>{{ stu.name }}</span>
+                            <a href="{{ url_for('classmaster_analysis', kw=kw, student_id=stu.student_id) }}" class="btn btn-sm btn-info">查看</a>
+                        </li>
+                        {% endfor %}
+                        {% if not students %}
+                        <li class="list-group-item">暂无学生</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="col-md-8">
+                    {% if report_data %}
+                        {% include 'classmaster/_student_report_panel.html' %}
+                    {% else %}
+                        <div class="alert alert-info">请选择左侧学生查看近期学习报告</div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

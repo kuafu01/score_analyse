@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>学生成绩管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
+        .content-area { padding: 2rem; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        {% include 'classmaster/_sidebar.html' %}
+        <main class="col-md-10 ml-sm-auto content-area">
+            <h2 class="mb-4">学生成绩管理{% if class_name %} - {{ class_name }}{% endif %}</h2>
+            <form method="get" class="form-inline mb-3">
+                <select name="kw_exam" class="form-control mr-2">
+                    <option value="">全部考试</option>
+                    {% for exam in exam_options %}
+                        <option value="{{ exam }}" {% if exam == kw_exam %}selected{% endif %}>{{ exam }}</option>
+                    {% endfor %}
+                </select>
+                <select name="kw_subject" class="form-control mr-2">
+                    <option value="">全部学科</option>
+                    {% for subject in subject_options %}
+                        <option value="{{ subject }}" {% if subject == kw_subject %}selected{% endif %}>{{ subject }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">筛选</button>
+            </form>
+            {% if exams %}
+            <div class="accordion" id="examAccordion">
+                {% for exam in exams %}
+                <div class="card mb-2">
+                    <div class="card-header" id="heading{{ loop.index0 }}">
+                        <h5 class="mb-0">
+                            <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapse{{ loop.index0 }}" aria-expanded="true" aria-controls="collapse{{ loop.index0 }}">
+                                {{ exam.exam_name }}（{{ exam.exam_type }}，{{ exam.exam_date }}）
+                            </button>
+                        </h5>
+                    </div>
+                    <div id="collapse{{ loop.index0 }}" class="collapse show" aria-labelledby="heading{{ loop.index0 }}" data-parent="#examAccordion">
+                        <div class="card-body">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>学科</th>
+                                        <th>学生姓名</th>
+                                        <th>成绩</th>
+                                        <th>班级排名</th>
+                                        <th>学校排名</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for s in exam.scores %}
+                                    <tr>
+                                        <td>{{ s.subject }}</td>
+                                        <td>{{ s.student_name }}</td>
+                                        <td>{{ s.score }}</td>
+                                        <td>{{ s.class_ranking }}</td>
+                                        <td>{{ s.school_ranking }}</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-warning edit-score-btn"
+                                                data-exam-id="{{ exam.exam_id }}"
+                                                data-student-name="{{ s.student_name }}"
+                                                data-subject="{{ s.subject }}"
+                                                data-score="{{ s.score }}"
+                                                data-ranking="{{ s.ranking }}"
+                                            >更改</button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="alert alert-warning mt-4">暂无成绩数据。</div>
+            {% endif %}
+    <!-- 编辑成绩模态框 -->
+    <div class="modal fade" id="editScoreModal" tabindex="-1" role="dialog" aria-labelledby="editScoreModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <form method="post" action="/classmaster/scores" id="editScoreForm">
+            <div class="modal-header">
+              <h5 class="modal-title" id="editScoreModalLabel">更改成绩</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="exam_id" id="modal_exam_id">
+              <input type="hidden" name="student_name" id="modal_student_name">
+              <input type="hidden" name="subject" id="modal_subject">
+              <div class="form-group">
+                <label>学生姓名</label>
+                <input type="text" class="form-control" id="modal_student_name_show" readonly>
+              </div>
+              <div class="form-group">
+                <label>学科</label>
+                <input type="text" class="form-control" id="modal_subject_show" readonly>
+              </div>
+              <div class="form-group">
+                <label>成绩</label>
+                <input type="number" step="0.1" class="form-control" name="score" id="modal_score" required>
+              </div>
+              <div class="form-group">
+                <label>班级排名</label>
+                <input type="text" class="form-control" id="modal_class_ranking" readonly>
+              </div>
+              <div class="form-group">
+                <label>学校排名</label>
+                <input type="text" class="form-control" id="modal_school_ranking" readonly>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+              <button type="submit" class="btn btn-primary">保存更改</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // 填充模态框数据
+    $(document).on('click', '.edit-score-btn', function () {
+      var button = $(this);
+      $('#modal_exam_id').val(button.data('exam-id'));
+      $('#modal_student_name').val(button.data('student-name'));
+      $('#modal_subject').val(button.data('subject'));
+      $('#modal_student_name_show').val(button.data('student-name'));
+      $('#modal_subject_show').val(button.data('subject'));
+      $('#modal_score').val(button.data('score'));
+      $('#modal_class_ranking').val(button.data('class-ranking'));
+      $('#modal_school_ranking').val(button.data('school-ranking'));
+      $('#editScoreModal').modal('show');
+    });
+    </script>
+            
+        </main>
+    </div>
+</div>
+</body>
+</html>

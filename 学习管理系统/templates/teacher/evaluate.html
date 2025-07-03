@@ -15,73 +15,38 @@
     <div class="row">
         {% include 'teacher/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
-            <h2 class="mb-4">学生成绩评价</h2>
-            {% set ns = namespace(A=0, B=0, C=0, D=0) %}
-            {% for s in scores %}
-                {% if s[5] >= 90 %}
-                    {% set ns.A = ns.A + 1 %}
-                {% elif s[5] >= 75 %}
-                    {% set ns.B = ns.B + 1 %}
-                {% elif s[5] >= 60 %}
-                    {% set ns.C = ns.C + 1 %}
-                {% else %}
-                    {% set ns.D = ns.D + 1 %}
+            <div class="container mt-4">
+                <h4 class="mb-4">学生成绩评价</h4>
+                <form method="get" class="form-inline mb-3" id="query-form">
+                    <label class="mr-2">选择班级：</label>
+                    <select name="class_id" class="form-control mr-3" id="class-select">
+                        <option value="">--请选择--</option>
+                        {% for c in class_list %}
+                            <option value="{{ c[0] }}" {% if selected_class==c[0] %}selected{% endif %}>{{ c[1] }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">查询</button>
+                </form>
+                {% if students %}
+                <div class="card">
+                    <div class="card-header">学生列表</div>
+                    <ul class="list-group list-group-flush">
+                        {% for s in students %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between">
+                            <span class="font-weight-bold">{{ s[1] }}</span>
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted mr-3" style="font-size:0.95em;">学号：{{ s[0] }}</span>
+                                <span class="text-secondary mr-3" style="font-size:0.95em;">{{ s[2] }}</span>
+                                <a href="{{ url_for('teacher_evaluate_student', student_id=s[0]) }}" class="btn btn-outline-primary btn-sm">详情</a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% elif selected_class %}
+                <div class="alert alert-warning mt-3">该班暂无学生</div>
                 {% endif %}
-            {% endfor %}
-            <div class="mb-3">
-                <span class="badge badge-success">A：{{ ns.A }}</span>
-                <span class="badge badge-primary">B：{{ ns.B }}</span>
-                <span class="badge badge-info">C：{{ ns.C }}</span>
-                <span class="badge badge-danger">D：{{ ns.D }}</span>
             </div>
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th>学号</th>
-                        <th>姓名</th>
-                        <th>班级</th>
-                        <th>学科</th>
-                        <th>考试名称</th>
-                        <th>成绩</th>
-                        <th>评价</th>
-                        <th>老师评价</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for s in scores %}
-                    <tr>
-                        <td>{{ s[0] }}</td>
-                        <td>{{ s[1] }}</td>
-                        <td>{{ s[2] }}</td>
-                        <td>{{ s[3] }}</td>
-                        <td>{{ s[4] }}</td>
-                        <td>{{ s[5] }}</td>
-                        <td>
-                            {% if s[5] >= 90 %}
-                                <span class="badge badge-success">A</span>
-                            {% elif s[5] >= 75 %}
-                                <span class="badge badge-primary">B</span>
-                            {% elif s[5] >= 60 %}
-                                <span class="badge badge-info">C</span>
-                            {% else %}
-                                <span class="badge badge-danger">D</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <form method="post" action="/teacher/evaluate/update" class="form-inline mb-0">
-                                <input type="hidden" name="student_id" value="{{ s[0] }}">
-                                <input type="hidden" name="subject_name" value="{{ s[3] }}">
-                                <input type="hidden" name="exam_name" value="{{ s[4] }}">
-                                <textarea class="form-control form-control-sm mr-2" name="content" rows="1" style="min-width:120px;max-width:300px;resize:horizontal;display:inline-block;vertical-align:middle;">{{ s[6] if s|length > 6 else '' }}</textarea>
-                                <button type="submit" class="btn btn-sm btn-outline-primary">保存</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
         </main>
     </div>
 </div>

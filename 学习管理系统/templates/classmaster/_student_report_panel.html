@@ -1,0 +1,112 @@
+<form method="get" class="form-inline mb-3">
+    <label for="exam-select" class="mr-2">选择考试：</label>
+    <select id="exam-select" name="exam_id" class="form-control mr-2" onchange="this.form.submit()">
+        {% for exam in report_data.exam_list %}
+        <option value="{{ exam.exam_id }}" {% if exam.exam_id|string == report_data.selected_exam_id|string %}selected{% endif %}>
+            {{ exam.exam_name }} ({{ exam.exam_date }})
+        </option>
+        {% endfor %}
+    </select>
+    <input type="hidden" name="student_id" value="{{ selected_student.student_id }}">
+    <input type="hidden" name="kw" value="{{ kw }}">
+</form>
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-primary text-white">各科成绩柱状图</div>
+            <div class="card-body">
+                <canvas id="report-bar-chart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-info text-white">成绩十边形图</div>
+            <div class="card-body">
+                <canvas id="report-polygon-chart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% if not report_data.subjects %}
+<div class="alert alert-warning mt-3">暂无该考试成绩数据</div>
+{% endif %}
+{% if report_data.reports %}
+<div class="card mt-4">
+    <div class="card-header bg-secondary text-white">各科老师评语</div>
+    <div class="card-body">
+        <ul class="list-group">
+            {% for r in report_data.reports %}
+            <li class="list-group-item">
+                <strong>{{ r.subject }}（{{ r.teacher or '未知老师' }}）：</strong>
+                <span>{{ r.content }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var subjects = JSON.parse('{{ report_data.subjects|tojson|safe }}');
+    var scores = JSON.parse('{{ report_data.scores|tojson|safe }}');
+    if(subjects.length > 0) {
+        // 柱状图
+        const barCtx = document.getElementById('report-bar-chart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: subjects,
+                datasets: [{
+                    label: '成绩',
+                    data: scores,
+                    backgroundColor: 'rgba(0,123,255,0.5)',
+                    borderColor: '#007bff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: '成绩' } },
+                    x: { title: { display: true, text: '学科' } }
+                }
+            }
+        });
+        // 十边形雷达图
+        const polygonCtx = document.getElementById('report-polygon-chart').getContext('2d');
+        new Chart(polygonCtx, {
+            type: 'radar',
+            data: {
+                labels: subjects,
+                datasets: [{
+                    label: '成绩',
+                    data: scores,
+                    backgroundColor: 'rgba(23,162,184,0.2)',
+                    borderColor: '#17a2b8',
+                    pointBackgroundColor: '#17a2b8',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    r: {
+                        angleLines: { display: true },
+                        suggestedMin: 0,
+                        suggestedMax: 100,
+                        min: 0,
+                        max: 100,
+                        pointLabels: { font: { size: 14 } },
+                        ticks: { stepSize: 10, color: '#888' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                }
+            }
+        });
+    }
+</script>

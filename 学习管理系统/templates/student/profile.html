@@ -18,6 +18,10 @@
         <main class="col-md-10 ml-sm-auto content-area">
             <form method="post" action="/student/profile/edit" id="profileForm">
                 <div class="form-group">
+                    <label>学号</label>
+                    <input type="text" class="form-control" name="student_id" value="{{ info.student_id }}" readonly>
+                </div>
+                <div class="form-group">
                     <label>姓名</label>
                     <input type="text" class="form-control" name="name" value="{{ info.name }}" readonly>
                 </div>
@@ -28,6 +32,18 @@
                 <div class="form-group">
                     <label>出生日期</label>
                     <input type="date" class="form-control" name="birth_date" value="{{ info.birth_date }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>民族</label>
+                    <input type="text" class="form-control" name="nation" value="{{ info.nation }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>籍贯省份</label>
+                    <input type="text" class="form-control" name="province" value="{{ info.province }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>政治面貌</label>
+                    <input type="text" class="form-control" name="political_status" value="{{ info.political_status }}" readonly>
                 </div>
                 <div class="form-group">
                     <label>班级</label>

@@ -15,8 +15,66 @@
     <div class="row">
         {% include 'classmaster/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
-            <h2 class="mb-4">个人档案</h2>
-            <div class="alert alert-info">个人档案功能开发中...</div>
+            <h2 class="mb-4">班主任个人档案</h2>
+            <form method="post" action="/classmaster/profile/edit" id="profileForm">
+                <div class="form-group">
+                    <label>工号</label>
+                    <input type="text" class="form-control" name="teacher_id" value="{{ teacher_id }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>姓名</label>
+                    <input type="text" class="form-control" name="name" value="{{ name }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>性别</label>
+                    <input type="text" class="form-control" name="gender" value="{{ gender }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>职称</label>
+                    <input type="text" class="form-control" name="title" value="{{ title }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" class="form-control" name="contact_email" value="{{ contact_email }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>办公室地址</label>
+                    <input type="text" class="form-control" name="office_address" value="{{ office_address }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>联系电话</label>
+                    <input type="text" class="form-control" name="phone" value="{{ phone }}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>管理班级</label>
+                    <input type="text" class="form-control" value="{% if manage_classes %}{{ manage_classes|join('，') }}{% else %}—{% endif %}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>任教班级</label>
+                    <input type="text" class="form-control" value="{% if teach_classes %}{{ teach_classes|join('，') }}{% else %}—{% endif %}" readonly>
+                </div>
+                <button type="button" class="btn btn-primary float-right" id="editBtn">编辑个人档案</button>
+                <button type="submit" class="btn btn-success float-right mr-2 d-none" id="saveBtn">保存</button>
+                <button type="button" class="btn btn-secondary float-right mr-2 d-none" id="cancelBtn">取消</button>
+            </form>
+            <script>
+                const editBtn = document.getElementById('editBtn');
+                const saveBtn = document.getElementById('saveBtn');
+                const cancelBtn = document.getElementById('cancelBtn');
+                const form = document.getElementById('profileForm');
+                const inputs = form.querySelectorAll('input');
+                editBtn.onclick = function() {
+                    inputs.forEach(i => {
+                        if(i.name !== 'teacher_id' && i.name !== 'name') i.readOnly = false;
+                    });
+                    editBtn.classList.add('d-none');
+                    saveBtn.classList.remove('d-none');
+                    cancelBtn.classList.remove('d-none');
+                };
+                cancelBtn.onclick = function() {
+                    window.location.reload();
+                };
+            </script>
         </main>
     </div>
 </div>

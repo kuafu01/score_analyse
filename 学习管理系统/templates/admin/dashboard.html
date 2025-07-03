@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}管理员控制面板 - 学习管理系统{% endblock %}
+
+{% block content %}
+<div class="admin-bg-gradient"></div>
+<div class="content-header admin-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h2 style="margin:0;">管理员控制面板</h2>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger" style="margin-left:16px;"><i class="fas fa-sign-out-alt"></i> 退出登录</a>
+    </div>
+</div>
+<div class="content-body admin-dashboard-body">
+    <div class="profile-header admin-profile-header">
+        <div class="avatar-section">
+            <div class="avatar admin-avatar">
+                <i class="fas fa-user-shield"></i>
+            </div>
+        </div>
+        <div class="basic-info">
+            <h3 class="admin-name">{{ admin.cname }}</h3>
+            <p class="admin-id">管理员ID：{{ admin.cno }}</p>
+            <div class="admin-tags">
+                <span class="tag">系统管理员</span>
+                <span class="tag">用户管理</span>
+                <span class="tag">排课管理</span>
+            </div>
+        </div>
+        <div class="quick-stats">
+            <div class="stat-item">
+                <div class="stat-number">{{ student_count }}</div>
+                <div class="stat-label">学生总数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ teacher_count }}</div>
+                <div class="stat-label">教师总数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ class_count }}</div>
+                <div class="stat-label">班级总数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ course_count }}</div>
+                <div class="stat-label">课程总数</div>
+            </div>
+        </div>
+    </div>
+    <div class="profile-grid admin-profile-grid">
+        <div class="card admin-card">
+            <div class="card-header admin-card-header">
+                <h3 style="display:flex;align-items:center;justify-content:space-between;">
+                    <span><i class="fas fa-users"></i> 用户管理</span>
+                    <a href="{{ url_for('admin_manage_users') }}" class="btn btn-sm btn-primary" style="margin-left:16px;">
+                        <i class="fas fa-cog"></i> 管理
+                    </a>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-icon"><i class="fas fa-user-graduate"></i></div>
+                        <div class="info-content">
+                            <div class="info-label">学生用户</div>
+                            <div class="info-value">{{ student_count }} 人</div>
+                        </div>
+                        <div class="info-action">
+                            <!-- 管理按钮已移至标题栏 -->
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                        <div class="info-content">
+                            <div class="info-label">教师用户</div>
+                            <div class="info-value">{{ teacher_count }} 人</div>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon"><i class="fas fa-user-cog"></i></div>
+                        <div class="info-content">
+                            <div class="info-label">管理员</div>
+                            <div class="info-value">{{ admin_count }} 人</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card admin-card">
+        <div class="card-header admin-card-header">
+            <h3 style="display:flex;align-items:center;justify-content:space-between;">
+                <span><i class="fas fa-book"></i> 课程排课管理</span>
+                <a href="{{ url_for('admin_schedule_page') }}" class="btn btn-success btn-sm ms-2">开始排课</a>
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="info-list">
+                <div class="info-item">
+                    <div class="info-icon"><i class="fas fa-list"></i></div>
+                    <div class="info-content">
+                        <div class="info-label">课程总数</div>
+                        <div class="info-value">{{ course_count }} 门</div>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon"><i class="fas fa-chalkboard"></i></div>
+                    <div class="info-content">
+                        <div class="info-label">班级总数</div>
+                        <div class="info-value">{{ class_count }} 个</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_css %}
+<style>
+    body { background: #f7f7fa; }
+    .admin-bg-gradient {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        z-index: 0;
+        background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
+        pointer-events: none;
+        opacity: 0.92;
+    }
+    .admin-header { position: relative; z-index: 2; background: none; }
+    .admin-dashboard-body { position: relative; z-index: 2; }
+    .admin-profile-header {
+        background: linear-gradient(90deg, #8ec5fc 0%, #e0c3fc 100%);
+        border-radius: 20px;
+        box-shadow: 0 6px 32px rgba(142,197,252,0.10);
+        padding: 2.5rem 2.5rem 2rem 2.5rem;
+        margin-bottom: 2.5rem;
+        display: flex;
+        align-items: center;
+        gap: 2.5rem;
+        color: #2d3559;
+        border: 1.5px solid #e0c3fc;
+    }
+    .admin-avatar {
+        width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, #fff 0%, #e0c3fc 100%); color: #8ec5fc; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; box-shadow: 0 2px 12px rgba(142,197,252,0.13); margin-right: 1.5rem; border: 3px solid #8ec5fc;
+    }
+    .admin-name { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; color: #2d3559; letter-spacing: 1px; }
+    .admin-id { font-size: 1.1rem; color: #6a7ba2; margin-bottom: 1rem; }
+    .admin-tags { margin-bottom: 1.2rem; }
+    .admin-tags .tag { display: inline-block; background: rgba(142,197,252,0.18); color: #2d3559; border-radius: 8px; padding: 0.3rem 1.1rem; font-size: 1rem; font-weight: 600; margin-right: 0.7rem; }
+    .quick-stats { display: flex; gap: 2.2rem; margin-left: auto; }
+    .stat-item { text-align: center; }
+    .stat-number { font-size: 2.1rem; font-weight: 700; color: #2d3559; text-shadow: 0 2px 8px rgba(142,197,252,0.13); }
+    .stat-label { font-size: 1.1rem; color: #6a7ba2; }
+    .admin-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; }
+    .admin-card { border-radius: 18px; box-shadow: 0 4px 24px rgba(142,197,252,0.08); border: 1.5px solid #e0c3fc; overflow: hidden; background: linear-gradient(120deg, #fafdff 0%, #f7f7fa 100%); }
+    .admin-card-header { background: linear-gradient(90deg, #8ec5fc 0%, #e0c3fc 100%); color: #2d3559; border-radius: 18px 18px 0 0; border-bottom: 1.5px solid #e0c3fc; }
+    .admin-card-header h3 { font-size: 1.25rem; font-weight: 700; }
+    .info-list { padding: 1.2rem 0; }
+    .info-item { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.2rem; background: rgba(255,255,255,0.92); border-radius: 12px; padding: 1.1rem 1.5rem; box-shadow: 0 1px 8px rgba(142,197,252,0.04); border: 1px solid #e0c3fc; }
+    .info-icon { font-size: 1.6rem; color: #8ec5fc; background: #fff; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+    .info-label { font-size: 1.1rem; color: #2d3559; font-weight: 600; }
+    .info-value { font-size: 1.2rem; color: #8ec5fc; font-weight: 700; }
+    @media (max-width: 1200px) { .admin-profile-grid { grid-template-columns: 1fr; gap: 2rem; } }
+    @media (max-width: 900px) { .admin-profile-header { flex-direction: column; align-items: flex-start; gap: 1.2rem; padding: 1.2rem; } .quick-stats { margin-left: 0; gap: 1.2rem; } }
+    @media (max-width: 600px) { .admin-profile-header { padding: 0.7rem; } .admin-profile-grid { gap: 1rem; } }
+</style>
+{% endblock %}
