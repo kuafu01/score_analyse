@@ -869,8 +869,6 @@ def student_report():
 ################################
 
 
-
-
 # 教师-查看课表页面（可切换班级，可选只看自己所授科目）
 @app.route('/teacher/schedule', methods=['GET'])
 def teacher_schedule():
@@ -906,6 +904,7 @@ def teacher_schedule():
     weekdays = ['一','二','三','四','五','六','日']
     periods = list(range(1,9))
     return render_template('teacher/schedule.html', schedule_map=schedule_map, classes=classes, current_class_id=current_class_id, subjects=subjects, teachers=teachers, weekdays=weekdays, periods=periods, only_self=only_self)
+
 
 
 @app.route('/teacher/profile')
@@ -1577,6 +1576,9 @@ def classmaster_schedule():
     conn.close()
     weekdays = ['一','二','三','四','五','六','日']
     periods = list(range(1,9))
+
+
+
     return render_template('classmaster/schedule.html', schedule_map=schedule_map, classes=classes, current_class_id=current_class_id, subjects=subjects, teachers=teachers, weekdays=weekdays, periods=periods, only_self=only_self, active='schedule')
 
 # 班主任-学生成绩详情
@@ -1767,6 +1769,162 @@ def classmaster_edit_score():
     conn.close()
     flash('成绩已更新', 'success')
     return redirect(url_for('classmaster_scores'))
+
+
+
+
+##################
+# classmaster evaluate
+####################
+
+# 班主任-学生成绩评价入口（与教师端 teacher/evaluate 一致，限定本班）
+@app.route('/classmaster/evaluate', methods=['GET'])
+def classmaster_evaluate():
+    if session.get('role') != 'classmaster':
+        return redirect(url_for('login'))
+    classmaster_name = session.get('name')
+    print('班主任姓名:', classmaster_name)
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查找班主任所带班级
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    print('teacher_id查询结果:', row)
+    if not row:
+        conn.close()
+        print('未查到班主任teacher_id')
+        return render_template('classmaster/evaluate.html', class_list=[], students=[], selected_class=None)
+    teacher_id = row[0]
+    cursor.execute('SELECT class_id, class_name FROM class WHERE head_teacher_id=?', teacher_id)
+    class_list = cursor.fetchall()
+    print('班级列表:', class_list)
+    selected_class = request.args.get('class_id')
+    # 如果未选中班级且有班级，自动选中第一个班级并重定向
+    if not selected_class and class_list:
+        first_class_id = str(class_list[0][0])
+        conn.close()
+        return redirect(url_for('classmaster_evaluate', class_id=first_class_id))
+    students = []
+    if selected_class:
+        cursor.execute('''
+            SELECT s.student_id, s.name, c.class_name
+            FROM student s
+            JOIN class c ON s.class_id = c.class_id
+            WHERE s.class_id = ?
+            ORDER BY s.name
+        ''', selected_class)
+        students = cursor.fetchall()
+        print('学生列表:', students)
+    conn.close()
+    return render_template('classmaster/evaluate.html', class_list=class_list, students=students, selected_class=selected_class)
+
+@app.route('/classmaster/evaluate/student/<student_id>', methods=['GET'])
+def classmaster_evaluate_student(student_id):
+    if session.get('role') != 'classmaster':
+        return redirect(url_for('login'))
+    classmaster_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 查找学生基本信息及班级
+    cursor.execute('''
+        SELECT s.name, c.class_name FROM student s JOIN class c ON s.class_id = c.class_id WHERE s.student_id=?
+    ''', student_id)
+    stu_row = cursor.fetchone()
+    if not stu_row:
+        conn.close()
+        return '学生不存在'
+    stu_name, class_name = stu_row
+    # 查找该学生所有考试
+    cursor.execute('''
+        SELECT e.exam_id, e.exam_name, e.exam_date FROM exam_score es JOIN exam e ON es.exam_id = e.exam_id WHERE es.student_id=? GROUP BY e.exam_id, e.exam_name, e.exam_date ORDER BY e.exam_date DESC
+    ''', student_id)
+    exams = cursor.fetchall()
+    # 查找该学生所有学科
+    cursor.execute('''
+        SELECT DISTINCT s.subject_id, s.subject_name FROM exam_score es JOIN subject s ON es.subject_id = s.subject_id WHERE es.student_id=? ORDER BY s.subject_id
+    ''', student_id)
+    subjects = cursor.fetchall()
+    exam_data = []
+    for eid, ename, edate in exams:
+        row = {'exam_id': eid, 'exam_name': ename, 'exam_date': edate, 'scores': [], 'report': ''}
+        for subid, subname in subjects:
+            cursor.execute('SELECT score FROM exam_score WHERE student_id=? AND exam_id=? AND subject_id=?', student_id, eid, subid)
+            r = cursor.fetchone()
+            row['scores'].append({'subject': subname, 'score': r[0] if r else None})
+        # 班主任评价（可选：可扩展为班主任评价内容）
+        cursor.execute('SELECT content FROM study_report WHERE student_id=? AND report_date=? AND teacher_id=(SELECT teacher_id FROM teacher WHERE name=?)', student_id, edate, classmaster_name)
+        rep = cursor.fetchone()
+        row['report'] = rep[0] if rep else ''
+        # 查询班级均分
+        cursor.execute('''
+            SELECT AVG(score) FROM exam_score WHERE exam_id=? AND subject_id IN (SELECT subject_id FROM exam_score WHERE student_id=?) AND student_id IN (SELECT student_id FROM student WHERE class_id=(SELECT class_id FROM student WHERE student_id=?))
+        ''', eid, student_id, student_id)
+        avg_score = cursor.fetchone()[0]
+        row['class_avg'] = round(avg_score, 2) if avg_score is not None else None
+        # 查询本班所有学生该次考试总分
+        cursor.execute('''
+            SELECT s.student_id, SUM(es.score) as total
+            FROM student s
+            JOIN exam_score es ON s.student_id = es.student_id
+            WHERE s.class_id = (SELECT class_id FROM student WHERE student_id=?) AND es.exam_id = ?
+            GROUP BY s.student_id
+        ''', student_id, eid)
+        row['class_scores'] = [{'student_id': r[0], 'total': float(r[1]) if r[1] is not None else 0} for r in cursor.fetchall()]
+        exam_data.append(row)
+    conn.close()
+    return render_template('classmaster/evaluate_student.html', stu_name=stu_name, class_name=class_name, exam_data=exam_data, student_id=student_id)
+
+
+
+#################
+#end
+################
+
+
+# 班主任-学生成绩评价详情-保存评价（与教师端一致，权限为班主任）
+@app.route('/classmaster/evaluate/report/update', methods=['POST'])
+def classmaster_evaluate_report_update():
+    if session.get('role') != 'classmaster':
+        return {'status': 0, 'msg': '未登录'}
+    classmaster_name = session.get('name')
+    student_id = request.form.get('student_id')
+    exam_date = request.form.get('exam_date')
+    content = request.form.get('content', '').strip()
+    if not (student_id and exam_date and content):
+        return {'status': 0, 'msg': '参数不完整'}
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 获取班主任teacher_id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {'status': 0, 'msg': '班主任不存在'}
+    teacher_id = row[0]
+    # 检查该学生是否属于本班
+    cursor.execute('SELECT class_id FROM student WHERE student_id=?', student_id)
+    stu_row = cursor.fetchone()
+    if not stu_row:
+        conn.close()
+        return {'status': 0, 'msg': '学生不存在'}
+    student_class_id = stu_row[0]
+    cursor.execute('SELECT class_id FROM class WHERE head_teacher_id=?', teacher_id)
+    class_row = cursor.fetchone()
+    if not class_row or class_row[0] != student_class_id:
+        conn.close()
+        return {'status': 0, 'msg': '无权评价非本班学生'}
+    # 查找是否已有评价
+    cursor.execute('SELECT report_id FROM study_report WHERE student_id=? AND teacher_id=? AND report_date=?', student_id, teacher_id, exam_date)
+    r = cursor.fetchone()
+    if r:
+        cursor.execute('UPDATE study_report SET content=? WHERE report_id=?', content, r[0])
+    else:
+        import uuid
+        report_id = str(uuid.uuid4())[:20]
+        cursor.execute('INSERT INTO study_report (report_id, student_id, teacher_id, report_date, content, evaluation_level) VALUES (?, ?, ?, ?, ?, ?)', report_id, student_id, teacher_id, exam_date, content, None)
+    conn.commit()
+    conn.close()
+    return {'status': 1, 'msg': '评价已保存'}
 
 if __name__ == '__main__':
     app.run(debug=True)
