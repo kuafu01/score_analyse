@@ -1,3 +1,107 @@
+
+import pyodbc
+import uuid
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
+
+SQLSERVER_CONFIG = {
+    'driver': 'ODBC Driver 17 for SQL Server',
+    'server': 'localhost',
+    'database': 'score_analyse'
+}
+
+def get_conn():
+    conn_str = (
+        f"DRIVER={SQLSERVER_CONFIG['driver']};"
+        f"SERVER={SQLSERVER_CONFIG['server']};"
+        f"DATABASE={SQLSERVER_CONFIG['database']};"
+        "Trusted_Connection=yes;"
+    )
+    return pyodbc.connect(conn_str)
+
+# 教师端-保存班级成绩分析评价
+@app.route('/teacher/class/report/update', methods=['POST'])
+def teacher_class_report_update():
+    if session.get('role') != 'teacher':
+        return {'status': 0, 'msg': '未登录'}
+    teacher_name = session.get('name')
+    class_id = request.form.get('class_id')
+    exam_id = request.form.get('exam_id')
+    content = request.form.get('content', '').strip()
+    if not (class_id and exam_id and content):
+        return {'status': 0, 'msg': '参数不完整'}
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', teacher_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {'status': 0, 'msg': '教师不存在'}
+    teacher_id = row[0]
+    cursor.execute('SELECT report_id FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?', teacher_id, class_id, exam_id)
+    r = cursor.fetchone()
+    if r:
+        cursor.execute('UPDATE class_exam_report SET content=? WHERE report_id=?', content, r[0])
+    else:
+        import uuid
+        report_id = str(uuid.uuid4())[:20]
+        cursor.execute('INSERT INTO class_exam_report (report_id, teacher_id, class_id, exam_id, content) VALUES (?, ?, ?, ?, ?)', report_id, teacher_id, class_id, exam_id, content)
+    conn.commit()
+    conn.close()
+    return {'status': 1, 'msg': '评价已保存'}
+
+# 班主任端-保存班级成绩分析评价
+@app.route('/classmaster/class/report/update', methods=['POST'])
+def classmaster_class_report_update():
+    if session.get('role') != 'classmaster':
+        return {'status': 0, 'msg': '未登录'}
+    classmaster_name = session.get('name')
+    class_id = request.form.get('class_id')
+    exam_id = request.form.get('exam_id')
+    content = request.form.get('content', '').strip()
+    if not (class_id and exam_id and content):
+        return {'status': 0, 'msg': '参数不完整'}
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return {'status': 0, 'msg': '班主任不存在'}
+    teacher_id = row[0]
+    cursor.execute('SELECT report_id FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?', teacher_id, class_id, exam_id)
+    r = cursor.fetchone()
+    if r:
+        cursor.execute('UPDATE class_exam_report SET content=? WHERE report_id=?', content, r[0])
+    else:
+        import uuid
+        report_id = str(uuid.uuid4())[:20]
+        cursor.execute('INSERT INTO class_exam_report (report_id, teacher_id, class_id, exam_id, content) VALUES (?, ?, ?, ?, ?)', report_id, teacher_id, class_id, exam_id, content)
+    conn.commit()
+    conn.close()
+    return {'status': 1, 'msg': '评价已保存'}
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
+
+SQLSERVER_CONFIG = {
+    'driver': 'ODBC Driver 17 for SQL Server',
+    'server': 'localhost',
+    'database': 'score_analyse'
+}
+
+def get_conn():
+    conn_str = (
+        f"DRIVER={SQLSERVER_CONFIG['driver']};"
+        f"SERVER={SQLSERVER_CONFIG['server']};"
+        f"DATABASE={SQLSERVER_CONFIG['database']};"
+        "Trusted_Connection=yes;"
+    )
+    return pyodbc.connect(conn_str)
+
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import pyodbc
 from flask import jsonify
@@ -1130,6 +1234,14 @@ def teacher_class():
         conn.close()
         return render_template('teacher/class.html', class_list=[], exam_list=[], scores=[], report=None, selected_class=None, selected_exam=None)
     teacher_id = row[0]
+    # 获取老师所教科目（包括任课和主科）
+    cursor.execute('SELECT DISTINCT subject_id FROM teacher_class_subject WHERE teacher_id=?', teacher_id)
+    teacher_subject_ids = set(row[0] for row in cursor.fetchall())
+    cursor.execute('SELECT subject_id FROM teacher WHERE teacher_id=?', teacher_id)
+    row2 = cursor.fetchone()
+    if row2 and row2[0]:
+        teacher_subject_ids.add(row2[0])
+    # 只查该老师所教班级
     cursor.execute('''
         SELECT DISTINCT c.class_id, c.class_name
         FROM teacher_class_subject tcs
@@ -1143,6 +1255,7 @@ def teacher_class():
     selected_exam = request.values.get('exam_id')
     scores = []
     report = None
+    subject_stats = {}
     if selected_class:
         cursor.execute('''
             SELECT DISTINCT e.exam_id, e.exam_name, e.exam_date
@@ -1155,75 +1268,75 @@ def teacher_class():
         exam_list = cursor.fetchall()
     else:
         exam_list = []
-    if selected_class and selected_exam:
-        cursor.execute('''
+    if selected_class and selected_exam and teacher_subject_ids:
+        # 只显示当前老师所教科目的各科均分
+        sql_subject_ids = ','.join(['?']*len(teacher_subject_ids))
+        cursor.execute(f'''
             SELECT sub.subject_name, AVG(es.score) as avg_score
             FROM exam_score es
             JOIN subject sub ON es.subject_id = sub.subject_id
             JOIN student s ON es.student_id = s.student_id
-            WHERE s.class_id = ? AND es.exam_id = ?
+            WHERE s.class_id = ? AND es.exam_id = ? AND es.subject_id IN ({sql_subject_ids})
             GROUP BY sub.subject_name
             ORDER BY sub.subject_name
-        ''', selected_class, selected_exam)
+        ''', (selected_class, selected_exam, *teacher_subject_ids))
         scores = cursor.fetchall()
+        # 教师报告（可选）
         cursor.execute('''
             SELECT content FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?
         ''', teacher_id, selected_class, selected_exam)
         report_row = cursor.fetchone()
         report = report_row[0] if report_row else None
-        subject_stats = {}
-        if selected_class and selected_exam:
-            cursor.execute('''
-                SELECT DISTINCT sub.subject_name
+        # 各科分数分布和历次均分（只显示本老师所教科目）
+        cursor.execute(f'''
+            SELECT DISTINCT sub.subject_name
+            FROM exam_score es
+            JOIN subject sub ON es.subject_id = sub.subject_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ? AND es.exam_id = ? AND es.subject_id IN ({sql_subject_ids})
+        ''', (selected_class, selected_exam, *teacher_subject_ids))
+        subject_names = [row[0] for row in cursor.fetchall()]
+        for subject in subject_names:
+            # 分数分布
+            cursor.execute(f'''
+                SELECT es.score
                 FROM exam_score es
                 JOIN subject sub ON es.subject_id = sub.subject_id
                 JOIN student s ON es.student_id = s.student_id
-                WHERE s.class_id = ? AND es.exam_id = ?
-            ''', selected_class, selected_exam)
-            subject_names = [row[0] for row in cursor.fetchall()]
-            for subject in subject_names:
-                cursor.execute('''
-                    SELECT es.score
-                    FROM exam_score es
-                    JOIN subject sub ON es.subject_id = sub.subject_id
-                    JOIN student s ON es.student_id = s.student_id
-                    WHERE s.class_id = ? AND es.exam_id = ? AND sub.subject_name = ?
-                ''', selected_class, selected_exam, subject)
-                scores_list = [float(r[0]) for r in cursor.fetchall()]
-                levels = ['A', 'B', 'C', 'D']
-                level_counts = [0, 0, 0, 0]
-                for score in scores_list:
-                    if score >= 90:
-                        level_counts[0] += 1
-                    elif score >= 75:
-                        level_counts[1] += 1
-                    elif score >= 60:
-                        level_counts[2] += 1
-                    else:
-                        level_counts[3] += 1
-                cursor.execute('''
-                    SELECT e.exam_name, AVG(es.score)
-                    FROM exam_score es
-                    JOIN exam e ON es.exam_id = e.exam_id
-                    JOIN subject sub ON es.subject_id = sub.subject_id
-                    JOIN student s ON es.student_id = s.student_id
-                    WHERE s.class_id = ? AND sub.subject_name = ?
-                    GROUP BY e.exam_name, e.exam_date
-                    ORDER BY e.exam_date
-                ''', selected_class, subject)
-                exam_rows = cursor.fetchall()
-                exam_names = [r[0] for r in exam_rows]
-                exam_avgs = [float(r[1]) if r[1] is not None else 0 for r in exam_rows]
-                subject_stats[subject] = {
-                    'levels': levels,
-                    'level_counts': level_counts,
-                    'exam_names': exam_names,
-                    'exam_avgs': exam_avgs
-                }
-        else:
-            subject_stats = {}
-    else:
-        subject_stats = {}
+                WHERE s.class_id = ? AND es.exam_id = ? AND sub.subject_name = ? AND es.subject_id IN ({sql_subject_ids})
+            ''', (selected_class, selected_exam, subject, *teacher_subject_ids))
+            scores_list = [float(r[0]) for r in cursor.fetchall()]
+            levels = ['A', 'B', 'C', 'D']
+            level_counts = [0, 0, 0, 0]
+            for score in scores_list:
+                if score >= 90:
+                    level_counts[0] += 1
+                elif score >= 75:
+                    level_counts[1] += 1
+                elif score >= 60:
+                    level_counts[2] += 1
+                else:
+                    level_counts[3] += 1
+            # 历次均分
+            cursor.execute(f'''
+                SELECT e.exam_name, AVG(es.score)
+                FROM exam_score es
+                JOIN exam e ON es.exam_id = e.exam_id
+                JOIN subject sub ON es.subject_id = sub.subject_id
+                JOIN student s ON es.student_id = s.student_id
+                WHERE s.class_id = ? AND sub.subject_name = ? AND es.subject_id IN ({sql_subject_ids})
+                GROUP BY e.exam_name, e.exam_date
+                ORDER BY e.exam_date
+            ''', (selected_class, subject, *teacher_subject_ids))
+            exam_rows = cursor.fetchall()
+            exam_names = [r[0] for r in exam_rows]
+            exam_avgs = [float(r[1]) if r[1] is not None else 0 for r in exam_rows]
+            subject_stats[subject] = {
+                'levels': levels,
+                'level_counts': level_counts,
+                'exam_names': exam_names,
+                'exam_avgs': exam_avgs
+            }
     conn.close()
     return render_template('teacher/class.html', class_list=class_list, exam_list=exam_list, scores=scores, report=report, selected_class=selected_class, selected_exam=selected_exam, subject_stats=subject_stats)
 
@@ -1726,13 +1839,126 @@ def classmaster_analysis():
     conn.close()
     return render_template('classmaster/analysis.html', students=students, class_name=class_name, kw=kw, selected_student=selected_student, report_data=report_data)
 
-# 班主任-成绩分析与管理
-@app.route('/classmaster/score')
-def classmaster_score():
+
+# 班主任-班级成绩分析与管理（布局与 teacher/class 保持一致）
+@app.route('/classmaster/class', methods=['GET', 'POST'])
+def classmaster_class():
     if session.get('role') != 'classmaster':
         return redirect(url_for('login'))
-    # 这里可以后续扩展分析功能，暂时只渲染页面
-    return render_template('classmaster/score.html')
+    classmaster_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 获取班主任 teacher_id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('classmaster/class.html', class_list=[], exam_list=[], scores=[], report=None, selected_class=None, selected_exam=None, subject_stats={})
+    teacher_id = row[0]
+    # 只查班主任所带班级
+    cursor.execute('''
+        SELECT class_id, class_name FROM class WHERE head_teacher_id=? ORDER BY class_id
+    ''', teacher_id)
+    class_list = cursor.fetchall()
+    exam_list = []
+    selected_class = request.values.get('class_id')
+    selected_exam = request.values.get('exam_id')
+    scores = []
+    report = None
+    subject_stats = {}
+    # 获取当前老师所教科目（包括班主任和任课老师）
+    cursor.execute('''
+        SELECT DISTINCT subject_id FROM teacher_class_subject WHERE teacher_id=?
+    ''', teacher_id)
+    teacher_subject_ids = set(row[0] for row in cursor.fetchall())
+    # 如果老师本身有 subject_id 字段（如体育老师），也加进去
+    cursor.execute('SELECT subject_id FROM teacher WHERE teacher_id=?', teacher_id)
+    row = cursor.fetchone()
+    if row and row[0]:
+        teacher_subject_ids.add(row[0])
+    if selected_class:
+        # 查该班所有考试
+        cursor.execute('''
+            SELECT DISTINCT e.exam_id, e.exam_name, e.exam_date
+            FROM exam_score es
+            JOIN exam e ON es.exam_id = e.exam_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ?
+            ORDER BY e.exam_date DESC
+        ''', selected_class)
+        exam_list = cursor.fetchall()
+    else:
+        exam_list = []
+    if selected_class and selected_exam and teacher_subject_ids:
+        # 只显示当前老师所教科目的各科均分
+        cursor.execute(f'''
+            SELECT sub.subject_name, AVG(es.score) as avg_score
+            FROM exam_score es
+            JOIN subject sub ON es.subject_id = sub.subject_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ? AND es.exam_id = ? AND es.subject_id IN ({','.join(['?']*len(teacher_subject_ids))})
+            GROUP BY sub.subject_name
+            ORDER BY sub.subject_name
+        ''', (selected_class, selected_exam, *teacher_subject_ids))
+        scores = cursor.fetchall()
+        # 班主任报告（可选）
+        cursor.execute('''
+            SELECT content FROM class_exam_report WHERE teacher_id=? AND class_id=? AND exam_id=?
+        ''', teacher_id, selected_class, selected_exam)
+        report_row = cursor.fetchone()
+        report = report_row[0] if report_row else None
+        # 各科分数分布和历次均分（只显示本老师所教科目）
+        cursor.execute(f'''
+            SELECT DISTINCT sub.subject_name
+            FROM exam_score es
+            JOIN subject sub ON es.subject_id = sub.subject_id
+            JOIN student s ON es.student_id = s.student_id
+            WHERE s.class_id = ? AND es.exam_id = ? AND es.subject_id IN ({','.join(['?']*len(teacher_subject_ids))})
+        ''', (selected_class, selected_exam, *teacher_subject_ids))
+        subject_names = [row[0] for row in cursor.fetchall()]
+        for subject in subject_names:
+            # 分数分布
+            cursor.execute(f'''
+                SELECT es.score
+                FROM exam_score es
+                JOIN subject sub ON es.subject_id = sub.subject_id
+                JOIN student s ON es.student_id = s.student_id
+                WHERE s.class_id = ? AND es.exam_id = ? AND sub.subject_name = ? AND es.subject_id IN ({','.join(['?']*len(teacher_subject_ids))})
+            ''', (selected_class, selected_exam, subject, *teacher_subject_ids))
+            scores_list = [float(r[0]) for r in cursor.fetchall()]
+            levels = ['A', 'B', 'C', 'D']
+            level_counts = [0, 0, 0, 0]
+            for score in scores_list:
+                if score >= 90:
+                    level_counts[0] += 1
+                elif score >= 75:
+                    level_counts[1] += 1
+                elif score >= 60:
+                    level_counts[2] += 1
+                else:
+                    level_counts[3] += 1
+            # 历次均分
+            cursor.execute(f'''
+                SELECT e.exam_name, AVG(es.score)
+                FROM exam_score es
+                JOIN exam e ON es.exam_id = e.exam_id
+                JOIN subject sub ON es.subject_id = sub.subject_id
+                JOIN student s ON es.student_id = s.student_id
+                WHERE s.class_id = ? AND sub.subject_name = ? AND es.subject_id IN ({','.join(['?']*len(teacher_subject_ids))})
+                GROUP BY e.exam_name, e.exam_date
+                ORDER BY e.exam_date
+            ''', (selected_class, subject, *teacher_subject_ids))
+            exam_rows = cursor.fetchall()
+            exam_names = [r[0] for r in exam_rows]
+            exam_avgs = [float(r[1]) if r[1] is not None else 0 for r in exam_rows]
+            subject_stats[subject] = {
+                'levels': levels,
+                'level_counts': level_counts,
+                'exam_names': exam_names,
+                'exam_avgs': exam_avgs
+            }
+    conn.close()
+    return render_template('classmaster/class.html', class_list=class_list, exam_list=exam_list, scores=scores, report=report, selected_class=selected_class, selected_exam=selected_exam, subject_stats=subject_stats)
 
 # 班主任-更改学生成绩
 @app.route('/classmaster/edit_score', methods=['POST'])

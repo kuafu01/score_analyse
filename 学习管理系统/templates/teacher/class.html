@@ -62,10 +62,31 @@
                         $('#query-form').submit();
                     }
                 });
+
+                // 评价保存（页面下方无分布图时也能保存）
+                $('#save-report-btn').click(function() {
+                    var class_id = '{{ selected_class or "" }}';
+                    var exam_id = '{{ selected_exam or "" }}';
+                    var content = $('#report-content').val();
+                    if (!class_id || !exam_id) {
+                        alert('请先选择班级和考试');
+                        return;
+                    }
+                    $.post('/teacher/class/report/update', {
+                        class_id: class_id,
+                        exam_id: exam_id,
+                        content: content
+                    }, function(res) {
+                        if (res.status == 1) {
+                            alert('评价已保存');
+                        } else {
+                            alert(res.msg || '保存失败');
+                        }
+                    });
+                });
             });
             </script>
             {% if scores %}
-            <h5>各科平均分</h5>
             <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
@@ -88,7 +109,6 @@
             </table>
             <div id="detail-area" style="display:none;">
                 <h5 id="detail-title"></h5>
-                <div id="report-eval-area"></div>
                 <div class="row">
                     <div class="col-md-6">
                         <div id="pie-total" class="mb-1" style="font-weight:bold;"></div>
@@ -109,33 +129,6 @@
                 if (!stat) return;
                 document.getElementById('detail-area').style.display = '';
                 document.getElementById('detail-title').innerText = subjectName + ' 详情';
-                // 评价表单
-                var classId = '{{ selected_class }}';
-                var examId = '{{ selected_exam }}';
-                var reportContent = '';
-                {% if report %} reportContent = `{{ report|replace('`','\`') }}`; {% endif %}
-                var evalHtml = `<form id='report-form' class='mb-3'>
-                    <input type='hidden' name='class_id' value='${classId}'>
-                    <input type='hidden' name='exam_id' value='${examId}'>
-                    <div class='form-group mb-2'>
-                        <label>班级成绩分析评价：</label>
-                        <textarea name='content' class='form-control' rows='2' placeholder='请输入本班本次考试的分析评价...'>${reportContent}</textarea>
-                    </div>
-                    <button type='submit' class='btn btn-success btn-sm'>保存评价</button>
-                    <span id='report-msg' class='ml-3 text-success'></span>
-                </form>`;
-                $('#report-eval-area').html(evalHtml);
-                $('#report-form').submit(function(e){
-                    e.preventDefault();
-                    var form = $(this);
-                    $.post('/teacher/class/report/update', form.serialize(), function(res){
-                        if(res.status==1){
-                            $('#report-msg').text('评价已保存！');
-                        }else{
-                            $('#report-msg').text(res.msg).removeClass('text-success').addClass('text-danger');
-                        }
-                    });
-                });
                 // 饼图
                 var total = stat.level_counts.reduce((a,b)=>a+b,0);
                 document.getElementById('pie-total').innerText = '总人数：' + total;
@@ -170,6 +163,17 @@
             }
             </script>
             {% endif %}
+
+            {# 只保留全局评价输入框 #}
+            <div class="card mt-4">
+                <div class="card-header">班级成绩分析评价</div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <textarea id="report-content" name="content" rows="5" class="form-control" placeholder="请输入本班本次考试的分析评价...">{{ report or '' }}</textarea>
+                    </div>
+                    <button id="save-report-btn" class="btn btn-primary">保存评价</button>
+                </div>
+            </div>
         </main>
     </div>
 </div>
