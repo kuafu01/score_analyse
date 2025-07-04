@@ -1,24 +1,62 @@
-<!DOCTYPE html>
-<html lang="zh-cn">
-<head>
-    <meta charset="UTF-8">
-    <title>班级成绩分析</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <style>
-        body { background: #f8f9fa; }
-        .sidebar { min-height: 100vh; background: #fff; border-right: 1px solid #dee2e6; }
-        .content-area { padding: 2rem; }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block content %}
 <div class="container-fluid">
     <div class="row">
         {% include 'classmaster/_sidebar.html' %}
         <main class="col-md-10 ml-sm-auto content-area">
-            <h2 class="mb-4">班级成绩分析</h2>
-            <div class="alert alert-info">班级成绩分析功能开发中...</div>
+            <h2 class="mb-4">班级成绩分析与管理</h2>
+            <form method="post" class="form-inline mb-3">
+                <label class="mr-2">班级：</label>
+                <select name="class_id" class="form-control mr-3" onchange="this.form.submit()">
+                    <option value="">请选择班级</option>
+                    {% for c in class_list %}
+                        <option value="{{ c[0] }}" {% if selected_class == c[0]|string %}selected{% endif %}>{{ c[1] }}</option>
+                    {% endfor %}
+                </select>
+                <label class="mr-2">考试：</label>
+                <select name="exam_id" class="form-control mr-3" onchange="this.form.submit()">
+                    <option value="">请选择考试</option>
+                    {% for e in exam_list %}
+                        <option value="{{ e[0] }}" {% if selected_exam == e[0]|string %}selected{% endif %}>{{ e[1] }} ({{ e[2] }})</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% if scores %}
+            <h5>各科平均分</h5>
+            <table class="table table-bordered table-sm">
+                <thead><tr><th>学科</th><th>平均分</th></tr></thead>
+                <tbody>
+                {% for s in scores %}
+                    <tr><td>{{ s[0] }}</td><td>{{ '%.2f'|format(s[1]) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% if subject_stats %}
+            <h5>学科分布</h5>
+            <div class="row">
+                {% for subject, scores in subject_stats.items() %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-header">{{ subject }}</div>
+                        <div class="card-body">
+                            <div>分数分布：</div>
+                            <div>
+                                {% for score in scores %}
+                                    <span class="badge badge-info">{{ score }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if report %}
+            <h5>考试分析报告</h5>
+            <div class="alert alert-secondary">{{ report }}</div>
+            {% endif %}
         </main>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}
