@@ -869,8 +869,6 @@ def student_report():
 ################################
 
 
-
-
 # 教师-查看课表页面（可切换班级，可选只看自己所授科目）
 @app.route('/teacher/schedule', methods=['GET'])
 def teacher_schedule():
@@ -906,6 +904,7 @@ def teacher_schedule():
     weekdays = ['一','二','三','四','五','六','日']
     periods = list(range(1,9))
     return render_template('teacher/schedule.html', schedule_map=schedule_map, classes=classes, current_class_id=current_class_id, subjects=subjects, teachers=teachers, weekdays=weekdays, periods=periods, only_self=only_self)
+
 
 
 @app.route('/teacher/profile')
