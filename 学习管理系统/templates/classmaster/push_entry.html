@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow">
+        <div class="card-body text-center">
+          <h4 class="mb-4">推送/评论</h4>
+          <a href="{{ url_for('classmaster_push_comment') }}" class="btn btn-primary btn-block mb-3">新建推送</a>
+          <a href="{{ url_for('push_list') }}" class="btn btn-outline-secondary btn-block">查看推送列表</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

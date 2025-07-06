@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% from '_comment_section.html' import comment_section %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-body">
+          <h4 class="mb-3">{{ push[1] }}</h4>
+          <div class="mb-2 text-muted">类型：{{ push[3] }} | 发布人：{{ push[7] }}({{ push[8] }}) | 时间：{{ push[9] }}</div>
+          <div class="mb-3">{{ push[2] }}</div>
+          {% if push[6] %}
+          <div class="mb-2"><a href="{{ url_for('push_attachment', push_id=push[0]) }}" target="_blank">下载附件</a></div>
+          {% endif %}
+          {{ comment_section(push, comments) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+$(function(){
+  $('#commentForm').on('submit', function(e){
+    e.preventDefault();
+    $.ajax({
+      url: $(this).attr('action'),
+      type: 'POST',
+      data: $(this).serialize(),
+      dataType: 'json',
+      success: function(res){
+        if(res.status===1){ location.reload(); }
+        else{ alert(res.msg||'评论失败'); }
+      },
+      error: function(){ alert('评论失败'); }
+    });
+  });
+});
+</script>
+{% endblock %}

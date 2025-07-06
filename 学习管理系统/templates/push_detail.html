@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}推送详情{% endblock %}
+{% block content %}
+<div class="container-fluid main-bg py-4 min-vh-100">
+  <div class="row">
+    <div class="col-md-2">
+      {% if session['role']=='classmaster' %}
+        {% include 'classmaster/_sidebar.html' %}
+      {% elif session['role']=='teacher' %}
+        {% include 'teacher/_sidebar.html' %}
+      {% elif session['role']=='student' %}
+        {% include 'student/_sidebar.html' %}
+      {% endif %}
+    </div>
+    <div class="col-md-10">
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <span class="h5 mb-0">推送详情</span>
+          {% if push and push[4] %}<span class="badge bg-warning text-dark">置顶</span>{% endif %}
+        </div>
+        <div class="card-body">
+          {% if push %}
+            <h4 class="mb-3">{{ push[1] }}</h4>
+            <div class="mb-2"><strong>类型：</strong>{{ push[3] }}</div>
+            <div class="mb-2"><strong>发布时间：</strong>{{ push[9] }}</div>
+            <div class="mb-2"><strong>发布人：</strong>{{ push[8] }} ({{ push[7] }})</div>
+            <div class="mb-2"><strong>内容：</strong></div>
+            <div class="border rounded p-3 bg-light mb-2" style="white-space: pre-line;">{{ push[2] }}</div>
+            {% if push[6] %}
+              <div class="mb-2"><strong>附件：</strong> <a href="{{ url_for('push_attachment', push_id=push[0]) }}" target="_blank">下载附件</a></div>
+            {% endif %}
+          {% else %}
+            <div class="alert alert-warning">未找到推送信息</div>
+          {% endif %}
+          <a href="{{ url_for('push_list') }}" class="btn btn-secondary mt-2">返回列表</a>
+        </div>
+      </div>
+      <!-- 评论区 -->
+      <div class="card shadow-sm mt-4">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">评论区</h5>
+        </div>
+        <div class="card-body">
+          {% if comments %}
+          <ul class="list-group mb-3">
+            {% for c in comments %}
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between">
+                <span><strong>{{ c[2] }}</strong> ({{ c[1] }})</span>
+                <span class="text-muted" style="font-size:0.9em;">{{ c[4] }}</span>
+              </div>
+              <div class="mt-2">{{ c[3] }}</div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-muted mb-3">暂无评论</div>
+          {% endif %}
+          {% if session['role'] %}
+          <form method="post" action="{{ url_for('push_comment_add') }}">
+            <input type="hidden" name="push_id" value="{{ push[0] }}">
+            <div class="mb-2">
+              <textarea name="content" class="form-control" rows="2" placeholder="发表评论..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">发表评论</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

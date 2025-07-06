@@ -62,6 +62,8 @@ def create_database_and_tables():
 
     # 再按外键依赖顺序删除表（如存在）
     drop_table_cmds = [
+        "IF OBJECT_ID('push_comment', 'U') IS NOT NULL DROP TABLE push_comment;",
+        "IF OBJECT_ID('class_push', 'U') IS NOT NULL DROP TABLE class_push;",
         "IF OBJECT_ID('teacher_class_subject', 'U') IS NOT NULL DROP TABLE teacher_class_subject;",
         "IF OBJECT_ID('study_report', 'U') IS NOT NULL DROP TABLE study_report;",
         "IF OBJECT_ID('exam_score', 'U') IS NOT NULL DROP TABLE exam_score;",
@@ -211,5 +213,57 @@ def create_database_and_tables():
     cursor.close()
     conn.close()
 
+
+# ================== 推送/评论功能相关表结构 ==================
+def create_push_and_comment_tables():
+    conn_str = (
+        f"DRIVER={SQLSERVER_CONFIG['driver']};"
+        f"SERVER={SQLSERVER_CONFIG['server']};"
+        f"DATABASE={SQLSERVER_CONFIG['database']};"
+        "Trusted_Connection=yes;"
+    )
+    conn = pyodbc.connect(conn_str, autocommit=True)
+    cursor = conn.cursor()
+    # 创建推送表 class_push
+    try:
+        cursor.execute('''
+            IF OBJECT_ID('class_push', 'U') IS NULL
+            CREATE TABLE class_push (
+                push_id VARCHAR(32) PRIMARY KEY,
+                class_id VARCHAR(20),
+                publisher_id VARCHAR(20),
+                publisher_role VARCHAR(20),
+                title TEXT,
+                content TEXT,
+                push_type VARCHAR(20),
+                is_top INT,
+                top_expire DATETIME,
+                attachment_path TEXT,
+                create_time DATETIME
+            )
+        ''')
+        print('class_push 表已创建或已存在。')
+    except Exception as e:
+        print(f'class_push 表创建失败: {e}')
+    # 创建评论表 push_comment
+    try:
+        cursor.execute('''
+            IF OBJECT_ID('push_comment', 'U') IS NULL
+            CREATE TABLE push_comment (
+                comment_id VARCHAR(32) PRIMARY KEY,
+                push_id VARCHAR(32),
+                user_id VARCHAR(20),
+                user_role VARCHAR(20),
+                content TEXT,
+                create_time DATETIME
+            )
+        ''')
+        print('push_comment 表已创建或已存在。')
+    except Exception as e:
+        print(f'push_comment 表创建失败: {e}')
+    cursor.close()
+    conn.close()
+
 if __name__ == '__main__':
     create_database_and_tables()
+    create_push_and_comment_tables()

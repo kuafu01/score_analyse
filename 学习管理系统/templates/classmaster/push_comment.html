@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="main-bg min-vh-100">
+  <div class="container-fluid">
+    <div class="row">
+      <!-- 只 include 菜单内容，不要 col-md-2 -->
+      <div class="d-none d-md-block p-0" style="min-width:200px;max-width:220px;">
+        <div class="sidebar h-100 bg-white border-right">
+          <div class="list-group list-group-flush mt-4">
+            <a href="/classmaster/profile" class="list-group-item list-group-item-action" id="nav-profile">个人档案</a>
+            <a href="/classmaster/students" class="list-group-item list-group-item-action" id="nav-students">班级学生档案</a>
+            <a href="/classmaster/scores" class="list-group-item list-group-item-action" id="nav-scores">学生成绩管理</a>
+            <a href="/classmaster/analysis" class="list-group-item list-group-item-action" id="nav-analysis">学生学习情况</a>
+            <a href="/classmaster/score" class="list-group-item list-group-item-action" id="nav-score">成绩分析与管理</a>
+            <a href="/classmaster/class" class="list-group-item list-group-item-action" id="nav-class">班级成绩分析</a>
+            <a href="/classmaster/evaluate" class="list-group-item list-group-item-action" id="nav-evaluate">学生成绩评价</a>
+            <a href="/classmaster/push_comment" class="list-group-item list-group-item-action active" id="nav-push-comment">推送/评论</a>
+            <a href="/classmaster/schedule" class="list-group-item list-group-item-action" id="nav-schedule">班级课表</a>
+            <a href="/logout" class="list-group-item list-group-item-action text-danger mt-5">退出登录</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-10 px-0">
+        <div class="content-area" style="background:#f6f8fa;min-height:100vh;">
+          <div class="container mt-4">
+            <div class="card shadow-sm" style="max-width:700px;margin:auto;">
+              <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-bullhorn me-2"></i>新建推送</h4>
+              </div>
+              <div class="card-body p-4">
+                <form id="pushForm" method="post" enctype="multipart/form-data" action="{{ url_for('classmaster_push_comment') }}" autocomplete="off">
+                  <div class="form-group mb-3">
+                    <label for="push_type">推送类型</label>
+                    <select class="form-control" id="push_type" name="push_type" required>
+                      <option value="important" selected>班级重要通知（默认置顶）</option>
+                      <option value="activity">班级活动</option>
+                      <option value="daily">班级日常</option>
+                      <option value="quiz">学习小测验</option>
+                    </select>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="title">标题</label>
+                    <input type="text" class="form-control" id="title" name="title" maxlength="100" required placeholder="请输入推送标题">
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="content">正文</label>
+                    <textarea class="form-control" id="content" name="content" rows="7" maxlength="2000" required placeholder="请输入推送正文，最多2000字"></textarea>
+                  </div>
+                  <div class="form-group mb-3" id="pinned_duration_group" style="display:none;">
+                    <label for="pinned_duration">置顶时长（天）</label>
+                    <input type="number" class="form-control" id="pinned_duration" name="pinned_duration" min="1" max="30" value="3">
+                  </div>
+                  <div class="form-group mb-3" id="attachment_group" style="display:none;">
+                    <label for="attachment">上传附件（可选）</label>
+                    <input type="file" class="form-control-file" id="attachment" name="attachment">
+                    <div class="text-right text-muted" style="font-size:0.98rem;">支持图片、文档、压缩包等常用格式</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary mt-3 w-100"><i class="fas fa-paper-plane me-1"></i>发布推送</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <script>
+          // 根据类型显示置顶时长和附件
+          function updateFormFields() {
+            var type = document.getElementById('push_type').value;
+            document.getElementById('pinned_duration_group').style.display = (type === 'important') ? '' : 'none';
+            document.getElementById('attachment_group').style.display = (type === 'important' || type === 'activity') ? '' : 'none';
+          }
+          document.getElementById('push_type').addEventListener('change', updateFormFields);
+          window.onload = updateFormFields;
+          </script>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

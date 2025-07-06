@@ -1,0 +1,29 @@
+{% macro comment_section(push, comments) %}
+<div class="card mt-4">
+  <div class="card-header bg-light">评论区</div>
+  <div class="card-body">
+    {% if session.get('role') %}
+    <form id="commentForm" method="post" action="{{ url_for('push_comment_add') }}">
+      <input type="hidden" name="push_id" value="{{ push[0] }}">
+      <div class="form-group">
+        <textarea class="form-control" name="content" rows="2" placeholder="请输入评论..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm mt-2">发表评论</button>
+    </form>
+    {% else %}
+    <div class="alert alert-warning">请登录后发表评论。</div>
+    {% endif %}
+    <hr>
+    <div id="commentList">
+      {% for c in comments %}
+      <div class="mb-2">
+        <b>{{ c[1] }}({{ c[2] }})</b>：{{ c[3] }}
+        <span class="text-muted float-right" style="font-size:12px">{{ c[4] }}</span>
+      </div>
+      {% else %}
+      <div class="text-muted">暂无评论</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endmacro %}

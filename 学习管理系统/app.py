@@ -52,6 +52,13 @@ def teacher_class_report_update():
     conn.close()
     return {'status': 1, 'msg': '评价已保存'}
 
+# 班主任端-推送/评论入口选择页面
+@app.route('/classmaster/push_entry')
+def classmaster_push_entry():
+    if session.get('role') != 'classmaster':
+        return redirect(url_for('login'))
+    return render_template('classmaster/push_entry.html')
+
 # 班主任端-保存班级成绩分析评价
 @app.route('/classmaster/class/report/update', methods=['POST'])
 def classmaster_class_report_update():
@@ -500,6 +507,100 @@ def admin_reset_password(user_type, user_id):
     return jsonify({'success': True})
 
 # ================== 课程排课管理相关接口 ==================
+
+# ================== 推送/评论相关接口 ==================
+# 注意：所有推送相关接口需插入在本注释后且不改动已有代码和注释。
+
+from flask import send_from_directory
+import os
+
+# 判断是否为Ajax请求
+def is_ajax():
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+# 新增推送
+@app.route('/push/add', methods=['GET', 'POST'])
+def push_add():
+    if 'role' not in session:
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        push_type = request.form.get('push_type', '普通')
+        is_top = int(request.form.get('is_top', 0))
+        attachments = request.files.getlist('attachments')
+        user_id = session.get('user_id')
+        role = session.get('role')
+        # 附件保存
+        attach_paths = []
+        upload_dir = os.path.join(os.path.dirname(__file__), 'static', 'push_attachments')
+        os.makedirs(upload_dir, exist_ok=True)
+        for file in attachments:
+            if file and file.filename:
+                fname = str(uuid.uuid4()) + '_' + file.filename
+                fpath = os.path.join(upload_dir, fname)
+                file.save(fpath)
+                attach_paths.append(fname)
+        attach_str = ';'.join(attach_paths)
+        push_id = str(uuid.uuid4())[:20]
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO push (push_id, user_id, role, title, content, push_type, is_top, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())''',
+            push_id, user_id, role, title, content, push_type, is_top, attach_str)
+        conn.commit()
+        conn.close()
+        flash('推送已发布', 'success')
+        return redirect(url_for('push_list'))
+    return render_template(f'{session["role"]}/push_add.html')
+
+
+
+
+
+# 删除推送
+@app.route('/push/delete/<push_id>', methods=['POST'])
+def push_delete(push_id):
+    if 'role' not in session:
+        return redirect(url_for('login'))
+    user_id = session.get('user_id')
+    role = session.get('role')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 仅本人或管理员可删
+    cursor.execute('SELECT user_id, role FROM push WHERE push_id=?', push_id)
+    row = cursor.fetchone()
+    if not row or (row[0] != user_id and role != 'admin'):
+        conn.close()
+        return jsonify({'success': False, 'msg': '无权限'}), 403
+    cursor.execute('DELETE FROM push WHERE push_id=?', push_id)
+    cursor.execute('DELETE FROM comment WHERE push_id=?', push_id)
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+
+
+# 删除评论
+@app.route('/push/comment/delete/<comment_id>', methods=['POST'])
+def push_comment_delete(comment_id):
+    if 'role' not in session:
+        return jsonify({'success': False, 'msg': '未登录'}), 401
+    user_id = session.get('user_id')
+    role = session.get('role')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id, role, push_id FROM comment WHERE comment_id=?', comment_id)
+    row = cursor.fetchone()
+    if not row or (row[0] != user_id and role != 'admin'):
+        conn.close()
+        return jsonify({'success': False, 'msg': '无权限'}), 403
+    push_id = row[2]
+    cursor.execute('DELETE FROM comment WHERE comment_id=?', comment_id)
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'push_id': push_id})
+
+
 # 1. 获取所有班级列表
 @app.route('/admin/schedule/classes')
 def admin_schedule_classes():
@@ -2151,6 +2252,266 @@ def classmaster_evaluate_report_update():
     conn.commit()
     conn.close()
     return {'status': 1, 'msg': '评价已保存'}
+
+
+
+
+#######################
+#123                  #
+#######################
+
+# ================== 推送/评论功能相关接口及表结构设计 ==================
+#
+# 表结构建议（请在数据库中手动建表，或用迁移工具）：
+# 1. 推送表 class_push (
+#     push_id VARCHAR(32) PRIMARY KEY,
+#     class_id VARCHAR(20),
+#     publisher_id VARCHAR(20), -- 发布人id（班主任/老师）
+#     publisher_role VARCHAR(20), -- 发布人角色
+#     title TEXT,
+#     content TEXT,
+#     push_type VARCHAR(20), -- 重要通知/活动/日常/小测验
+#     is_top INTEGER, -- 是否置顶
+#     top_expire DATETIME, -- 置顶到期时间
+#     attachment_path TEXT, -- 附件路径
+#     create_time DATETIME
+# )
+# 2. 评论表 push_comment (
+#     comment_id VARCHAR(32) PRIMARY KEY,
+#     push_id VARCHAR(32),
+#     user_id VARCHAR(20),
+#     user_role VARCHAR(20),
+#     content TEXT,
+#     create_time DATETIME
+# )
+
+# ========== 推送列表（班主任/老师/学生端） ==========
+@app.route('/push/list')
+def push_list():
+    """推送列表，支持按班级、类型筛选，供班主任/老师/学生端使用"""
+    if not session.get('role'):
+        return redirect(url_for('login'))
+    user_role = session.get('role')
+    user_id = session.get('username')
+    class_id = request.args.get('class_id')
+    push_type = request.args.get('push_type')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 学生自动查自己班级，老师/班主任可选
+    if user_role == 'student':
+        cursor.execute('SELECT class_id FROM student WHERE student_id=?', user_id)
+        row = cursor.fetchone()
+        class_id = row[0] if row else None
+    elif not class_id:
+        # 班主任/老师默认查第一个班级
+        if user_role == 'classmaster':
+            cursor.execute('SELECT class_id FROM class WHERE head_teacher_id=(SELECT teacher_id FROM teacher WHERE name=?)', session.get('name'))
+            row = cursor.fetchone()
+            class_id = row[0] if row else None
+        elif user_role == 'teacher':
+            cursor.execute('SELECT class_id FROM teacher_class_subject WHERE teacher_id=(SELECT teacher_id FROM teacher WHERE name=?)', session.get('name'))
+            row = cursor.fetchone()
+            class_id = row[0] if row else None
+    sql = 'SELECT push_id, title, content, push_type, is_top, top_expire, attachment_path, publisher_id, publisher_role, create_time FROM class_push WHERE 1=1'
+    params = []
+    if class_id:
+        sql += ' AND class_id=?'
+        params.append(class_id)
+    if push_type:
+        sql += ' AND push_type=?'
+        params.append(push_type)
+    sql += ' ORDER BY is_top DESC, CASE WHEN top_expire IS NOT NULL AND top_expire > GETDATE() THEN 1 ELSE 0 END DESC, create_time DESC'
+    cursor.execute(sql, *params)
+    push_list = cursor.fetchall()
+    conn.close()
+    # 可根据端渲染不同模板
+    if user_role == 'student':
+        return render_template('student/push_list.html', push_list=push_list)
+    elif user_role == 'teacher':
+        return render_template('teacher/push_list.html', push_list=push_list)
+    else:
+        return render_template('classmaster/push_list.html', push_list=push_list)
+
+# ========== 推送详情及评论列表 ==========
+# ========== 推送详情及评论列表 ==========
+@app.route('/push/detail/<push_id>')
+def push_detail(push_id):
+    """推送详情，含评论列表"""
+    if not session.get('role'):
+        return redirect(url_for('login'))
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT push_id, title, content, push_type, is_top, top_expire, attachment_path, publisher_id, publisher_role, create_time FROM class_push WHERE push_id=?', (push_id,))
+    push = cursor.fetchone()
+    cursor.execute('SELECT comment_id, user_id, user_role, content, create_time FROM push_comment WHERE push_id=? ORDER BY create_time ASC', (push_id,))
+    comments = cursor.fetchall()
+    conn.close()
+    # 根据端渲染不同详情模板
+    role = session.get('role')
+    if role == 'student':
+        return render_template('student/push_detail.html', push=push, comments=comments)
+    elif role == 'teacher':
+        return render_template('teacher/push_detail.html', push=push, comments=comments)
+    elif role == 'classmaster':
+        return render_template('classmaster/push_detail.html', push=push, comments=comments)
+    else:
+        return render_template('push_detail.html', push=push, comments=comments)
+
+# ========== 新建评论 ==========
+@app.route('/push/comment/add', methods=['POST'])
+def push_comment_add():
+    """添加评论，所有登录用户可用"""
+    if not session.get('role'):
+        return {'status': 0, 'msg': '未登录'}
+    user_id = session.get('username')
+    user_role = session.get('role')
+    push_id = request.form.get('push_id')
+    content = request.form.get('content', '').strip()
+    if not (push_id and content):
+        return {'status': 0, 'msg': '参数不完整'}
+    import uuid, datetime
+    comment_id = str(uuid.uuid4())[:32]
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO push_comment (comment_id, push_id, user_id, user_role, content, create_time) VALUES (?, ?, ?, ?, ?, ?)',
+                   (comment_id, push_id, user_id, user_role, content, now))
+    conn.commit()
+    conn.close()
+    return {'status': 1, 'msg': '评论已发布'}
+
+# ========== 新建推送（学科老师端） ==========
+@app.route('/teacher/push/add', methods=['GET', 'POST'])
+def teacher_push_add():
+    """学科老师新建推送（与班主任类似）"""
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    teacher_name = session.get('name')
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 获取老师所教班级
+    cursor.execute('SELECT DISTINCT class_id FROM teacher_class_subject WHERE teacher_id=(SELECT teacher_id FROM teacher WHERE name=?)', teacher_name)
+    class_rows = cursor.fetchall()
+    class_list = [r[0] for r in class_rows]
+    if request.method == 'POST':
+        class_id = request.form.get('class_id')
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        push_type = request.form.get('push_type')
+        is_top = int(request.form.get('is_top', 0))
+        top_expire = request.form.get('top_expire')
+        attachment = request.files.get('attachment')
+        import uuid, datetime, os
+        push_id = str(uuid.uuid4())[:32]
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        attachment_path = None
+        if attachment and attachment.filename:
+            save_dir = os.path.join('static', 'push_attachments')
+            os.makedirs(save_dir, exist_ok=True)
+            fname = f"{push_id}_{attachment.filename}"
+            fpath = os.path.join(save_dir, fname)
+            attachment.save(fpath)
+            attachment_path = fpath
+        cursor.execute('INSERT INTO class_push (push_id, class_id, publisher_id, publisher_role, title, content, push_type, is_top, top_expire, attachment_path, create_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                       (push_id, class_id, session.get('username'), 'teacher', title, content, push_type, is_top, top_expire, attachment_path, now))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('push_list'))
+    conn.close()
+    return render_template('teacher/push_add.html', class_list=class_list)
+
+# ========== 新建推送（学生端无此功能，仅可评论） ==========
+# 其他端如需扩展，仿照 teacher_push_add 或班主任端实现即可。
+
+# ========== 附件下载接口 ==========
+@app.route('/push/attachment/<push_id>')
+def push_attachment(push_id):
+    """下载推送附件"""
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT attachment_path FROM class_push WHERE push_id=?', push_id)
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return '未找到附件', 404
+    import os
+    from flask import send_file
+    fpath = row[0]
+    if not os.path.exists(fpath):
+        return '文件不存在', 404
+    return send_file(fpath, as_attachment=True)
+
+# ================== END 推送/评论功能接口 ==================
+
+# ================== 推送/评论相关接口 ==================
+import os
+from werkzeug.utils import secure_filename
+
+
+# 班主任-新建推送页面和提交（合并GET/POST）
+@app.route('/classmaster/push_comment', methods=['GET', 'POST'])
+def classmaster_push_comment():
+    if session.get('role') != 'classmaster':
+        return redirect(url_for('login'))
+    if request.method == 'GET':
+        return render_template('classmaster/push_comment.html')
+    # POST
+    classmaster_name = session.get('name')
+    push_type = request.form.get('push_type')
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    # 自动置顶逻辑：重要通知默认置顶3天，其它类型不置顶
+    if push_type == 'important':
+        is_top = 1
+        top_days = int(request.form.get('pinned_duration', 3)) or 3
+    else:
+        is_top = 0
+        top_days = 0
+    # 附件处理
+    attachment_url = None
+    if 'attachment' in request.files:
+        file = request.files['attachment']
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            upload_dir = os.path.join('static', 'uploads', 'push')
+            os.makedirs(upload_dir, exist_ok=True)
+            file_path = os.path.join(upload_dir, filename)
+            file.save(file_path)
+            attachment_url = '/' + file_path.replace('\\', '/')
+    # 获取班主任id和班级id
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        flash('班主任不存在', 'danger')
+        return redirect(url_for('classmaster_push_comment'))
+    teacher_id = row[0]
+    cursor.execute('SELECT class_id FROM class WHERE head_teacher_id=?', teacher_id)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        flash('未找到班级', 'danger')
+        return redirect(url_for('classmaster_push_comment'))
+    class_id = row[0]
+    import uuid
+    push_id = str(uuid.uuid4())[:20]
+    from datetime import datetime, timedelta
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    top_expire = (datetime.now() + timedelta(days=top_days)).strftime('%Y-%m-%d %H:%M:%S') if is_top and top_days else None
+    # 插入推送表，字段名与class_push表结构一致
+    cursor.execute('''
+        INSERT INTO class_push (push_id, class_id, publisher_id, publisher_role, title, content, push_type, is_top, top_expire, attachment_path, create_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (push_id, class_id, teacher_id, 'classmaster', title, content, push_type, is_top, top_expire, attachment_url, now))
+    conn.commit()
+    conn.close()
+    flash('推送已发布', 'success')
+    return redirect(url_for('push_list'))
+
+# TODO: 其他推送/评论相关接口（如推送列表、详情、评论等）可按需继续添加
+
 
 if __name__ == '__main__':
     app.run(debug=True)

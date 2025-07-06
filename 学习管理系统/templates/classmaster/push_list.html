@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}推送列表{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-2">
+      {% include 'classmaster/_sidebar.html' %}
+    </div>
+    <div class="col-md-10">
+      <h2 class="mt-3 mb-4">推送/通知列表</h2>
+      {% if push_list %}
+      <table class="table table-bordered table-hover bg-white">
+        <thead class="thead-light">
+          <tr>
+            <th>标题</th>
+            <th>类型</th>
+            <th>置顶</th>
+            <th>发布时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for push in push_list %}
+          <tr {% if push[4] %}class="table-warning"{% endif %}>
+            <td>{{ push[1] }}</td>
+            <td>
+              {% if push[3] == 'important' %}班级重要通知
+              {% elif push[3] == 'activity' %}班级活动
+              {% elif push[3] == 'daily' %}班级日常
+              {% elif push[3] == 'quiz' %}学习小测验
+              {% else %}{{ push[3] }}{% endif %}
+            </td>
+            <td>{% if push[4] %}是{% else %}否{% endif %}</td>
+            <td>{{ push[9] }}</td>
+            <td>
+              <a href="{{ url_for('push_detail', push_id=push[0]) }}" class="btn btn-sm btn-info">详情</a>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="alert alert-info mt-4">暂无推送信息</div>
+      {% endif %}
+      <a href="{{ url_for('classmaster_push_comment') }}" class="btn btn-primary mt-3">新建推送</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

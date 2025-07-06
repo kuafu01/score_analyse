@@ -508,5 +508,84 @@ def insert_test_data():
     conn.close()
     print('测试数据插入完成！')
 
+
+
+
+
+#123
+
+# ——推送/评论相关数据库操作示例——
+def insert_class_push(classmaster_name, title, content, push_type, is_top=0, top_days=0, attachment_url=None):
+    """
+    插入一条推送数据到 class_push 表。
+    :param classmaster_name: 班主任姓名
+    :param title: 推送标题
+    :param content: 推送内容
+    :param push_type: 推送类型
+    :param is_top: 是否置顶（0/1）
+    :param top_days: 置顶天数
+    :param attachment_url: 附件路径
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 获取班主任id和班级id
+    cursor.execute('SELECT teacher_id FROM teacher WHERE name=?', classmaster_name)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        print('班主任不存在')
+        return
+    teacher_id = row[0]
+    cursor.execute('SELECT class_id FROM class WHERE head_teacher_id=?', teacher_id)
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        print('未找到班级')
+        return
+    class_id = row[0]
+    import uuid
+    push_id = str(uuid.uuid4())[:20]
+    from datetime import datetime, timedelta
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    top_expire = (datetime.now() + timedelta(days=top_days)).strftime('%Y-%m-%d %H:%M:%S') if is_top and top_days else None
+    # 插入推送表
+    cursor.execute('''
+        INSERT INTO class_push (push_id, class_id, publisher_id, publisher_role, title, content, push_type, is_top, top_expire, attachment_path, create_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (push_id, class_id, teacher_id, 'classmaster', title, content, push_type, is_top, top_expire, attachment_url, now))
+    conn.commit()
+    conn.close()
+    print('推送已插入')
+
+def fetch_class_push_list(class_id=None, push_type=None):
+    """
+    查询推送列表，可按班级和类型筛选。
+    :param class_id: 班级ID
+    :param push_type: 推送类型
+    :return: 推送记录列表
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+    sql = 'SELECT push_id, title, content, push_type, is_top, top_expire, attachment_path, publisher_id, publisher_role, create_time FROM class_push WHERE 1=1'
+    params = []
+    if class_id:
+        sql += ' AND class_id=?'
+        params.append(class_id)
+    if push_type:
+        sql += ' AND push_type=?'
+        params.append(push_type)
+    sql += ' ORDER BY is_top DESC, (CASE WHEN top_expire IS NOT NULL AND top_expire>GETDATE() THEN 1 ELSE 0 END) DESC, create_time DESC'
+    cursor.execute(sql, *params)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+
+
 if __name__ == '__main__':
     insert_test_data()
+
+
+
+
